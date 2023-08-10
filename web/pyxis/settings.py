@@ -76,14 +76,15 @@ WSGI_APPLICATION = 'pyxis.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'pyxis',
+        'NAME': 'pyxis_v0',
         'USER': 'zion',
-        'PASSWORD': 'pyxis:zion:n$*3wWgq[{7$f]Pmse_qYpJ:!!%N',
-        'HOST': 'pyxis.cdxkl074ikh7.us-east-2.rds.amazonaws.com',
+        'PASSWORD': 'REPLACE YOUR OWN',
+        'HOST': 'REPLACE YOUR OWN',
         'PORT': '5432',
     }
 }
 
+# Use passfile for security reasons.
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
