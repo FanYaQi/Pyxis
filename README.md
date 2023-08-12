@@ -8,3 +8,5 @@ Pyxis project.
 
 https://stackoverflow.com/questions/35104097/how-to-install-psycopg2-with-pg-config-error
 
+2. Prerequisite for H3:
+https://github.com/uber/h3-py

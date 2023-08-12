@@ -1,6 +1,10 @@
 # Mac
 **/.DS_Store
 
+# Files
+data/
+db/src/test.ipynb
+
 # Sensitive Information
 .pyxis_pass
 
