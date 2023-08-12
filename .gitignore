@@ -2,8 +2,8 @@
 **/.DS_Store
 
 # Files
-data/
-db/src/test.ipynb
+db/data/
+db/notebooks/test.ipynb
 
 # Sensitive Information
 .pyxis_pass
