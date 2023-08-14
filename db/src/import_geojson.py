@@ -1,5 +1,6 @@
 import psycopg2
 import json
+from path_util import DATA_PATH
 
 # PostgreSQL connection parameters
 db_params = {
@@ -9,10 +10,8 @@ db_params = {
     "password": "6221"
 }
 
-# Path to the GeoJSON file
-geojson_path = "../data/tm_geodata/TM.json"
-
-def main():
+def import_geojson(table_name, geojson_path):
+    
     # Read GeoJSON file
     with open(geojson_path, 'r') as f:
         geojson_data = json.load(f)
@@ -32,7 +31,7 @@ def main():
         geometry = json.dumps(feature['geometry'])
         attributes_values = [feature['properties'].get(column) for column in attributes_columns]
         placeholders = ', '.join(['%s' for _ in attributes_columns])
-        insert_query = f"INSERT INTO geojson_features ({geometry_column}, {', '.join(attributes_columns)}) VALUES (ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), {placeholders})"
+        insert_query = f"INSERT INTO {table_name} ({geometry_column}, {', '.join(attributes_columns)}) VALUES (ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), {placeholders})"
         cursor.execute(insert_query, [geometry] + attributes_values)
 
     conn.commit()
@@ -41,4 +40,10 @@ def main():
     print("GeoJSON data inserted successfully!")
 
 if __name__ == "__main__":
-    main()
+
+    # Path to the GeoJSON file
+    geojson_path = f'{DATA_PATH}/tm_geodata/TM_well.json'
+
+    table_name = "tm_wm_well"
+
+    import_geojson(table_name, geojson_path)

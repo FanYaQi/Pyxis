@@ -34,3 +34,5 @@ pyxis=# \dx
 
 https://stackoverflow.com/questions/35104097/how-to-install-psycopg2-with-pg-config-error
 
+2. When write query in postgres, keep in mind to check the (x,y) coordinates for sequence of longitude and latitude.
+

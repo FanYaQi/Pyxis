@@ -29,14 +29,15 @@ def insert_h3_index_for_geoj(table_name, geojson_path, h3_resolution,
     for index, row in h3_polyfill_data.iterrows():
         field_id = row['index'] + 1
         h3_index = row.name
-        h3_geometry = row['geometry']
+        # h3_geometry = row['geometry'] #h3 geometry insert
 
         # Insert data into the specified table using a parameterized query
+        # if insert h3 geometry, ST_GeomFromText(%s, 4326) for values, h3_geometry.wkt for execute
         insert_query = """
         INSERT INTO {} ({}, {}, geometry)
-        VALUES (%s, %s, ST_GeomFromText(%s, 4326));
+        VALUES (%s, %s);
         """.format(table_name, colname_field_id, colname_h3_index)
-        cursor.execute(insert_query, (field_id, h3_index, h3_geometry.wkt))
+        cursor.execute(insert_query, (field_id, h3_index))
 
     conn.commit()
     cursor.close()
