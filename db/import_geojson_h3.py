@@ -2,7 +2,8 @@ import psycopg2
 import geopandas as gpd
 import json
 import h3pandas
-from path_util import DATA_PATH
+
+from utils.path_util import DATA_PATH
 
 # PostgreSQL connection parameters
 db_params = {
@@ -11,7 +12,6 @@ db_params = {
     "user": "yaqifan",
     "password": "6221"
 }
-
 
 def insert_h3_index_for_geoj(table_name, geojson_path, h3_resolution, 
                              colname_field_id="field_id", colname_h3_index="h3_index"):

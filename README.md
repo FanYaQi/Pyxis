@@ -28,6 +28,11 @@ pyxis=# \dx
 (5 rows)
 ```
 
+## Set Up PYTHON PATH
+1. Add python search path in .venv/bin/activate
+
+export PYTHONPATH = "/Users/yaqifan/Documents/Github/Pyxis/db"
+
 ## Trouble shooting
 
 1. When installing `psycopg2`, `Error: pg_config executable not found.`:

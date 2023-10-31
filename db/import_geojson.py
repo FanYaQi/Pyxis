@@ -1,6 +1,8 @@
 import psycopg2
 import json
-from path_util import DATA_PATH
+
+from utils.path_util import DATA_PATH
+
 
 # PostgreSQL connection parameters
 db_params = {
@@ -13,7 +15,7 @@ db_params = {
 def import_geojson(table_name, geojson_path):
     
     # Read GeoJSON file
-    with open(geojson_path, 'r') as f:
+    with open(geojson_path) as f:
         geojson_data = json.load(f)
 
     # Identify columns from the attributes of the first feature
@@ -31,8 +33,9 @@ def import_geojson(table_name, geojson_path):
         geometry = json.dumps(feature['geometry'])
         attributes_values = [feature['properties'].get(column) for column in attributes_columns]
         placeholders = ', '.join(['%s' for _ in attributes_columns])
-        insert_query = f"INSERT INTO {table_name} ({geometry_column}, {', '.join(attributes_columns)}) VALUES (ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), {placeholders})"
+        insert_query = f"INSERT INTO {table_name} ({geometry_column}, {', '.join(attributes_columns)}) VALUES (ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), {placeholders}) ON CONFLICT DO NOTHING"
         cursor.execute(insert_query, [geometry] + attributes_values)
+    
 
     conn.commit()
     cursor.close()
