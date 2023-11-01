@@ -23,6 +23,8 @@ def combine_shapefiles_to_geojson(input_folder, output_geojson,target_crs = 'EPS
         gdf_list.append(gdf)
     combined_gdf = gpd.GeoDataFrame(pd.concat(gdf_list, ignore_index=True))
 
+    # Add a unique serial ID field
+    combined_gdf['id_field'] = range(1, len(combined_gdf) + 1)
 
     # Write the combined GeoDataFrame to a GeoJSON file
     combined_gdf.to_file(output_geojson, driver='GeoJSON')

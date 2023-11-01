@@ -1,57 +1,70 @@
 import psycopg2
-import geopandas as gpd
-import json
 import h3pandas
+import geopandas as gpd
 
-from utils.path_util import DATA_PATH
+def create_h3_table(db_params, existing_table_name,new_table_name, h3_resolution,
+                    id_column, geometry_column):
+    try:
+        # Connect to the database
+        conn = psycopg2.connect(**db_params)
+        cursor = conn.cursor()
 
-# PostgreSQL connection parameters
-db_params = {
-    "host": "localhost",
-    "database": "postgres",
-    "user": "yaqifan",
-    "password": "6221"
-}
+        # Retrieve data from the existing table using Geopandas
+        gdf = gpd.read_postgis(f"""SELECT {id_column}, {geometry_column} FROM {existing_table_name}
+                               """, conn, geom_col="geometry")
 
-def insert_h3_index_for_geoj(table_name, geojson_path, h3_resolution, 
-                             colname_field_id="field_id", colname_h3_index="h3_index"):
-    # Read GeoJSON file
-    geojson_data = gpd.read_file(geojson_path)
+        # Convert geometry to h3 index
+        h3_polyfill_data = gdf.h3.polyfill_resample(h3_resolution)
 
+        # Create the new table
+        create_table_query = f"""
+        CREATE TABLE {new_table_name} (
+            {id_column} numeric,
+            h3_index h3index,
+            primary key ({id_column}, h3_index)
+        );
+        """
+        cursor.execute(create_table_query)
+        conn.commit()
 
-    # Connect to PostgreSQL
-    conn = psycopg2.connect(**db_params)
-    cursor = conn.cursor()
+        insert_query = f"""
+        INSERT INTO {new_table_name} ({id_column}, h3_index) VALUES (%s, %s);
+        """
 
-    # Convert geometry to h3 index
-    h3_polyfill_data = geojson_data.h3.polyfill_resample(h3_resolution)
+        for _, row in h3_polyfill_data.iterrows():
+            id = row[id_column]
+            h3_index = row.name
+            cursor.execute(insert_query, (id, h3_index))
 
-    for index, row in h3_polyfill_data.iterrows():
-        field_id = row['index'] + 1
-        h3_index = row.name
-        # h3_geometry = row['geometry'] #h3 geometry insert
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"H3 indexes added to the {new_table_name} table.")
+    
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-        # Insert data into the specified table using a parameterized query
-        # if insert h3 geometry, ST_GeomFromText(%s, 4326) for values, h3_geometry.wkt for execute
-        insert_query = """
-        INSERT INTO {} ({}, {}, geometry)
-        VALUES (%s, %s);
-        """.format(table_name, colname_field_id, colname_h3_index)
-        cursor.execute(insert_query, (field_id, h3_index))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("H3 polyfill data inserted into {} table successfully!".format(table_name))
 
 if __name__ == "__main__":
+    # PostgreSQL connection parameters
+    db_params = {
+        "host": "localhost",
+        "database": "postgres",
+        "user": "yaqifan",
+        "password": "6221"
+    }
 
     # Path to the GeoJSON file
-    geojson_path = f'{DATA_PATH}/tm_geodata/TM.json'
-
-    table_name = "tm_zhan_h3index"
-    
+    existing_table_name = "zhan_tm_field"
     h3_resolution = 9
+    new_table_name = f"tm_zhan_h3_{h3_resolution}"
+    primary_id_column = "id"
+    geometry_column = "geometry"
 
-    insert_h3_index_for_geoj(table_name, geojson_path, h3_resolution)
-
+    create_h3_table(db_params, existing_table_name,new_table_name, h3_resolution,
+                    primary_id_column, geometry_column)
