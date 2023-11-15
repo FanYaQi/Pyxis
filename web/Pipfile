@@ -4,10 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "4.1.7"
+uvicorn = {extras = ["standard"], version = "*"}
+fastapi = {extras = ["all"], version = "*"}
+sqlalchemy = "*"
+geoalchemy2 = {extras = ["shapely"], version = "*"}
 psycopg2 = "*"
+python-dotenv = "*"
 
 [dev-packages]
+black = "*"
 
 [requires]
-python_version = "3.10"
+python_version = "3.11"
