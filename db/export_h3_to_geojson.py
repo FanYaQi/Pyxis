@@ -4,33 +4,43 @@ import json
 from shapely.geometry import shape
 from utils.path_util import DATA_PATH
 
-def h3_cells_to_geojson(db_params, h3_column, table_name, output_file):
+def h3_cells_to_geojson(db_params, h3_column, table_name, output_file,additional_columns = None):
     try:
         # Establish a database connection
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
-        # Execute the SQL query to fetch H3 cell indexes
+        # Create a comma-separated string of additional column names for the SQL query
+        additional_columns_str = ", ".join(additional_columns)
+
+        # Execute the SQL query to fetch H3 cell indexes and the additional columns
         sql_query = f"""
-        SELECT {h3_column}
+        SELECT {h3_column}, {additional_columns_str}
         FROM {table_name};
         """
         cursor.execute(sql_query)
 
         # Fetch all H3 cell indexes
-        h3_cell_indexes = cursor.fetchall()
+        rows = cursor.fetchall()
 
         # Create a list to store GeoJSON features
         features = []
 
         # Convert H3 cell indexes to GeoJSON shapes
-        for h3_cell_index in h3_cell_indexes:
-            hexagon = h3.h3_to_geo_boundary(h3_cell_index[0], geo_json=True)
+        for row in rows:
+            hexagon = h3.h3_to_geo_boundary(row[0], geo_json=True)
             polygon = shape({'type': 'Polygon', 'coordinates': [hexagon]})
-            feature = {'type': 'Feature', 'geometry': polygon.__geo_interface__}
+            # Create a feature with geometry and properties
+            properties = {}
+            for i, column_name in enumerate(additional_columns):
+                properties[column_name] = float(row[i+1])
+
+            feature = {'type': 'Feature', 
+                       'geometry': polygon.__geo_interface__,
+                       'properties': properties}
+            
             features.append(feature)
 
-        # Create a GeoJSON FeatureCollection
         feature_collection = {'type': 'FeatureCollection', 'features': features}
 
         # Convert the FeatureCollection to a GeoJSON string
@@ -58,8 +68,17 @@ if __name__ == "__main__":
         "user": "yaqifan",
         "password": "6221"
     }
-    h3_column = "h3_index"
-    table_name = "tm_zhan_h3index"
-    output_file = f'{DATA_PATH}/tm_geodata/zhan_tm_h3_cells.json'
+    # h3_column = "h3_index"
+    # table_name = "well_with_zhan_id_2kring"
+    # output_file = f'{DATA_PATH}/tm_geodata/{table_name}.json'
+    # additional_col = ["id_pk","wm_field","zhan_field_id"]
 
-    h3_cells_to_geojson(db_params, h3_column, table_name, output_file)
+    # h3_cells_to_geojson(db_params, h3_column, table_name, output_file,additional_col)
+
+    h3_column = "h3_index"
+    table_name = "tm_zhan_h3_9_2ring_smooth"
+    output_file = f'{DATA_PATH}/tm_geodata/{table_name}.json'
+    additional_col = ["id"]
+
+    h3_cells_to_geojson(db_params, h3_column, table_name, output_file,additional_col)
+
