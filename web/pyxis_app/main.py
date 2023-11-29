@@ -8,4 +8,4 @@ app.include_router(fields.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Hello, this is the Pyxis Web"}
