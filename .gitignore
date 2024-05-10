@@ -5,6 +5,7 @@
 db/data/
 db/docs/
 db/notebooks/test.ipynb
+db/data_processing/test.py
 
 # Sensitive Information
 .pyxis_pass
