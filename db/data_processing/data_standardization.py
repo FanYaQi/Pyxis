@@ -181,6 +181,8 @@ class DataSource(ABC):
                 processed_row['geometry'] = row.geometry
 
             processed_row['Source ID'] = self.source_id
+            processed_row['Source Name'] = self.name
+
             for new_col_name, (input_cols, func) in self.config.items():
                 if new_col_name == 'Production method':
                     production_methods = func(row, input_cols)
@@ -212,48 +214,51 @@ class DataSource(ABC):
         self.data_score_avg = sum([score_weight[i] * score_cols[i] for i in range(len(score_weight))])
         self.metadata['Data Score'] = self.data_score_avg
 
+def main():
+    # Initialize WMDataSource with data and operations configuration
 
-# Initialize WMDataSource with data and operations configuration
+    zhan_data = gpd.read_file("./db/data/br_geodata/br_zhan/BR.shp")
+    zhan = DataSource(data=zhan_data,name = 'Zhang et al.', type = 'peer reviewed paper', time = '2021',
+                    url='https://iopscience.iop.org/article/10.1088/1748-9326/ac3956/meta',
+                    config=op_table['zhan'])
+    zhan.process()
+    zhan_source_table = zhan.source_info_table()
+    zhan.data_score([5,4,3])
+    print(zhan.metadata)
+    zhan_source_table.to_excel('./db/data/br_geodata/data_standardization/zhan.xlsx')
 
-zhan_data = gpd.read_file("./db/data/br_geodata/br_zhan/BR.shp")
-zhan = DataSource(data=zhan_data,name = 'Zhang et al.', type = 'peer reviewed paper', time = '2021',
-                  url='https://iopscience.iop.org/article/10.1088/1748-9326/ac3956/meta',
-                  config=op_table['zhan'])
-zhan.process()
-zhan_source_table = zhan.source_info_table()
-zhan.data_score([5,4,3])
-print(zhan.metadata)
-zhan_source_table.to_excel('./db/data/br_geodata/data_standardization/zhan.xlsx')
+    wm_data = gpd.read_file("./db/data/br_geodata/wm/BR.shp")
+    wm = DataSource(data=wm_data,name = 'Wood Mackenzie', type = 'commercial', time = '2022',
+                    url='Not open source',
+                    config=op_table['wm'])
+    wm.process()
+    wm_source_table = wm.source_info_table()
+    wm.data_score([4,5,5])
+    print(wm.metadata)
+    wm_source_table.to_excel('./db/data/br_geodata/data_standardization/wm.xlsx')
 
-wm_data = gpd.read_file("./db/data/br_geodata/wm/BR.shp")
-wm = DataSource(data=wm_data,name = 'Wood Mackenzie', type = 'commercial', time = '2022',
-                  url='Not open source',
-                  config=op_table['wm'])
-wm.process()
-wm_source_table = wm.source_info_table()
-wm.data_score([4,5,5])
-print(wm.metadata)
-wm_source_table.to_excel('./db/data/br_geodata/data_standardization/wm.xlsx')
+    anp_data = gpd.read_file("./db/data/br_geodata/anp/BR.shp")
+    anp = DataSource(data=anp_data,name = 'National Agency for Petroleum, Natural Gas and Biofuels', type = 'government', time = '2024',
+                    url='https://www.gov.br/anp/pt-br/assuntos/exploracao-e-producao-de-oleo-e-gas/dados-tecnicos',
+                    config=op_table['anp'])
+    anp.process()
+    anp_source_table = anp.source_info_table()
+    anp.data_score([4.5,5,4])
+    print(anp.metadata)
+    anp_source_table.to_excel('./db/data/br_geodata/data_standardization/anp.xlsx')
 
-anp_data = gpd.read_file("./db/data/br_geodata/anp/BR.shp")
-anp = DataSource(data=anp_data,name = 'National Agency for Petroleum, Natural Gas and Biofuels', type = 'government', time = '2024',
-                  url='https://www.gov.br/anp/pt-br/assuntos/exploracao-e-producao-de-oleo-e-gas/dados-tecnicos',
-                  config=op_table['anp'])
-anp.process()
-anp_source_table = anp.source_info_table()
-anp.data_score([4.5,5,4])
-print(anp.metadata)
-anp_source_table.to_excel('./db/data/br_geodata/data_standardization/anp.xlsx')
+    gogi_data = gpd.read_file("./db/data/br_geodata/gogi/BR.shp")
+    gogi = DataSource(data=gogi_data,name = 'National Energy Technology Laboratory', type = 'national lab', time = '2023',
+                    url='https://edx.netl.doe.gov/dataset/global-oil-gas-features-database',
+                    config=op_table['gogi'])
+    gogi.process()
+    gogi_source_table = gogi.source_info_table()
+    gogi.data_score([4.5,5,3]) #source/ recency/ coverage score
+    print(gogi.metadata)
+    gogi_source_table.to_excel('./db/data/br_geodata/data_standardization/gogi.xlsx')
 
-gogi_data = gpd.read_file("./db/data/br_geodata/gogi/BR.shp")
-gogi = DataSource(data=gogi_data,name = 'National Energy Technology Laboratory', type = 'national lab', time = '2023',
-                  url='https://edx.netl.doe.gov/dataset/global-oil-gas-features-database',
-                  config=op_table['gogi'])
-gogi.process()
-gogi_source_table = gogi.source_info_table()
-gogi.data_score([4.5,5,3]) #source/ recency/ coverage score
-print(gogi.metadata)
-gogi_source_table.to_excel('./db/data/br_geodata/data_standardization/gogi.xlsx')
+    source_metadata = pd.DataFrame([zhan.metadata,wm.metadata,anp.metadata,gogi.metadata])
+    source_metadata.to_excel('./db/data/br_geodata/data_standardization/source_metadata.xlsx')   
 
-source_metadata = pd.DataFrame([zhan.metadata,wm.metadata,anp.metadata,gogi.metadata])
-source_metadata.to_excel('./db/data/br_geodata/data_standardization/source_metadata.xlsx')
+if __name__ == '__main__':
+    main()
