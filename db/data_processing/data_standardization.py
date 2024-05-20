@@ -83,6 +83,10 @@ def process_calgor(gas,oil):
     if gas is not None and oil is not None and oil != 0:
         return gas*6000/oil
 
+def process_calwor(water,oil):
+    if water is not None and oil is not None and oil != 0:
+        return water/oil
+
 def process_offtag2bin_anp(input):
     if input is not None and isinstance(input, str):
         if unidecode(input.lower()) in ('Earth'):
@@ -124,6 +128,7 @@ op_table = {
     'Field age':(['Start of P'],process_getyr),
     'Oil production volume':(['Oil (bbl/d'],process_keep),
     'Gas-to-oil ratio (GOR)':(['Natural Ga','Oil (bbl/d'],process_calgor),
+    'Water-to-oil ratio (WOR)':(['Water (bbl','Oil (bbl/d'],process_calwor),
     'Number of producing wells':(['Number of'],process_keep),
     'Offshore':(['Location_x'],process_offtag2bin_anp),
     'API gravity (oil at standard pressure and temperature, or "dead oil")':(['API Petrol'],process_keep)
@@ -225,7 +230,7 @@ def main():
     zhan_source_table = zhan.source_info_table()
     zhan.data_score([5,4,3])
     print(zhan.metadata)
-    zhan_source_table.to_excel('./db/data/br_geodata/data_standardization/zhan.xlsx')
+    zhan_source_table.to_csv('./db/data/br_geodata/data_standardization/zhan.csv')
 
     wm_data = gpd.read_file("./db/data/br_geodata/wm/BR.shp")
     wm = DataSource(data=wm_data,name = 'Wood Mackenzie', type = 'commercial', time = '2022',
@@ -235,7 +240,7 @@ def main():
     wm_source_table = wm.source_info_table()
     wm.data_score([4,5,5])
     print(wm.metadata)
-    wm_source_table.to_excel('./db/data/br_geodata/data_standardization/wm.xlsx')
+    wm_source_table.to_csv('./db/data/br_geodata/data_standardization/wm.csv')
 
     anp_data = gpd.read_file("./db/data/br_geodata/anp/BR.shp")
     anp = DataSource(data=anp_data,name = 'National Agency for Petroleum, Natural Gas and Biofuels', type = 'government', time = '2024',
@@ -245,20 +250,20 @@ def main():
     anp_source_table = anp.source_info_table()
     anp.data_score([4.5,5,4])
     print(anp.metadata)
-    anp_source_table.to_excel('./db/data/br_geodata/data_standardization/anp.xlsx')
+    anp_source_table.to_csv('./db/data/br_geodata/data_standardization/anp.csv')
 
-    gogi_data = gpd.read_file("./db/data/br_geodata/gogi/BR.shp")
-    gogi = DataSource(data=gogi_data,name = 'National Energy Technology Laboratory', type = 'national lab', time = '2023',
-                    url='https://edx.netl.doe.gov/dataset/global-oil-gas-features-database',
-                    config=op_table['gogi'])
-    gogi.process()
-    gogi_source_table = gogi.source_info_table()
-    gogi.data_score([4.5,5,3]) #source/ recency/ coverage score
-    print(gogi.metadata)
-    gogi_source_table.to_excel('./db/data/br_geodata/data_standardization/gogi.xlsx')
+    # gogi_data = gpd.read_file("./db/data/br_geodata/gogi/BR.shp")
+    # gogi = DataSource(data=gogi_data,name = 'National Energy Technology Laboratory', type = 'national lab', time = '2023',
+    #                 url='https://edx.netl.doe.gov/dataset/global-oil-gas-features-database',
+    #                 config=op_table['gogi'])
+    # gogi.process()
+    # gogi_source_table = gogi.source_info_table()
+    # gogi.data_score([4.5,5,3]) #source/ recency/ coverage score
+    # print(gogi.metadata)
+    # gogi_source_table.to_csv('./db/data/br_geodata/data_standardization/gogi.csv')
 
-    source_metadata = pd.DataFrame([zhan.metadata,wm.metadata,anp.metadata,gogi.metadata])
-    source_metadata.to_excel('./db/data/br_geodata/data_standardization/source_metadata.xlsx')   
+    source_metadata = pd.DataFrame([zhan.metadata,wm.metadata,anp.metadata])
+    source_metadata.to_csv('./db/data/br_geodata/data_standardization/source_metadata.csv')   
 
 if __name__ == '__main__':
     main()

@@ -8,11 +8,11 @@ from pathlib import Path
 
 def load_source_data(file_path):
     """ Load data from an Excel file """
-    return pd.read_excel(file_path)
+    return pd.read_csv(file_path)
 
 def load_metadata(metadata_path):
     """ Load metadata from an Excel file """
-    return pd.read_excel(metadata_path)
+    return pd.read_csv(metadata_path)
 
 def sort_sources_by_score(metadata):
     """ Sort sources by 'Data Score' """
@@ -79,11 +79,11 @@ def match_sources(pyxis_match_table, new_source, score_threshold = 60):
 
 def main():
     # Paths to the source data and metadata
-    metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.xlsx'
-    data_files = [f'{DATA_PATH}/br_geodata/data_standardization/zhan.xlsx',
-                  f'{DATA_PATH}/br_geodata/data_standardization/wm.xlsx',
-                  f'{DATA_PATH}/br_geodata/data_standardization/anp.xlsx',
-                  f'{DATA_PATH}/br_geodata/data_standardization/gogi.xlsx']
+    metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
+    data_files = [f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/anp.csv']
+                #   f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv']
     
     # Load metadata and source data
     metadata = load_metadata(metadata_path)
@@ -101,7 +101,7 @@ def main():
         pyxis_match_table = match_sources(pyxis_match_table, source)
     
     # Save the Pyxis Match Table
-    pyxis_match_table.to_excel(f'{DATA_PATH}/br_geodata/pyxis_match_table.xlsx', index=False)
+    pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table.csv', index=False)
 
 if __name__ == '__main__':
     main()
