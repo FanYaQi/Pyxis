@@ -97,11 +97,11 @@ def merge_data(pyxis_match_table, source_info_tables, merge_rules):
             'Centroid H3 Index': centroid_h3_index,
             'Source ID used': ", ".join(set(group['Source ID'])),
             **merged_values,
-            'Geometry': merged_geometry,
+            'geometry': merged_geometry,
             'Detailed in use field': detailed_in_use
         }
         detailed_merge.append(merged_record)
-
+    
     return pd.DataFrame(detailed_merge)
 
 
@@ -110,10 +110,10 @@ def main():
     merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
     pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table.csv'
     source_info_paths = {
-        'e66272f3-09ef-4f8d-83b4-77da6f254e45':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
-        '90ddcde7-f4a7-41b3-b1dd-9c966e47ae66':f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
-        '73047c13-b769-4be2-9660-d4abe71c884b':f'{DATA_PATH}/br_geodata/data_standardization/anp.csv'
-        # '87baa7fa-da61-4992-9ce9-cc905718ca8c':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
+        'zhan2021':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+        'wm2022':f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
+        'anp2024':f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+        'gogi2023':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
     }
 
     # Load data

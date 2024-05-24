@@ -21,9 +21,8 @@ def sort_sources_by_score(metadata):
 def initialize_pyxis_match_table(source):
     """ Initialize the Pyxis Match Table from the highest score source """
     filtered_source = source[source['Name'].notna()]
-    pyxis_match_table = filtered_source[['Field ID', 'Name', 'Centroid H3 Index', 'Source ID','Source Name']].copy()
-    pyxis_match_table.rename(columns={'Field ID': 'Pyxis ID'}, inplace=True)
-    pyxis_match_table['Field ID'] = pyxis_match_table['Pyxis ID']
+    pyxis_match_table = filtered_source[['Name', 'Centroid H3 Index', 'Source ID','Source Name','Field ID']].copy()
+    pyxis_match_table.insert(0, 'Pyxis ID', range(0, len(pyxis_match_table)))
     pyxis_match_table['Match Score'] = 100  # Initial match score
     return pyxis_match_table
 
@@ -36,10 +35,13 @@ def calculate_match_score(name1, name2, index1, index2, weight = [0.7, 0.3]):
     if index1 is not None and index2 is not None:
         try:
             grid_distance = h3.h3_distance(index1, index2)
+            if grid_distance < 50:
             # Normalize distance to a score
-            geo_score = 100 * np.exp(-0.5 * np.power(grid_distance*0.1,2))  # gaussian distribution
+                geo_score = 100 * np.exp(-0.5 * np.power(grid_distance*0.1,2))  # gaussian distribution
+            else:
+                geo_score = -40
         except ValueError:
-            geo_score = -30 # Handle cases where distance cannot be computed (too far away)
+            geo_score = -40 # Handle cases where distance cannot be computed (too far away)
     else:
         geo_score = 0
     return weight[0] * name_score + weight[1] * geo_score
@@ -82,8 +84,8 @@ def main():
     metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
     data_files = [f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
                   f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
-                  f'{DATA_PATH}/br_geodata/data_standardization/anp.csv']
-                #   f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv']
+                  f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv']
     
     # Load metadata and source data
     metadata = load_metadata(metadata_path)
