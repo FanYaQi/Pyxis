@@ -78,6 +78,31 @@ def match_sources(pyxis_match_table, new_source, score_threshold = 60):
 
     return pyxis_match_table
 
+def filter_pyxis_match(df, government_source_id, other_sources):
+    """ Filter the Pyxis Match Table according to specific criteria """
+    # Calculate the required number of sources dynamically
+    total_sources = [government_source_id] + other_sources
+    required_count = len(total_sources) // 2 + 1
+    
+    # Identify Pyxis IDs that contain the government source ID
+    pyxis_with_gov = df[df['Source ID'] == government_source_id]['Pyxis ID'].unique()
+    
+    # Identify Pyxis IDs that contain at least the required number of other sources
+    source_counts = df[df['Source ID'].isin(other_sources)].groupby('Pyxis ID').size()
+    pyxis_with_required_sources = source_counts[source_counts >= required_count].index
+    
+    # Combine both conditions
+    pyxis_ids_to_keep = set(pyxis_with_gov).union(set(pyxis_with_required_sources))
+    
+    # Filter the DataFrame to keep rows for the identified Pyxis IDs
+    filtered_df = df[df['Pyxis ID'].isin(pyxis_ids_to_keep)]
+    
+    # Reorganize IDs sequentially, keeping the same ID for identical Pyxis IDs
+    id_map = {old_id: new_id for new_id, old_id in enumerate(sorted(filtered_df['Pyxis ID'].unique()))}
+    filtered_df['Pyxis ID'] = filtered_df['Pyxis ID'].map(id_map)
+    
+    return filtered_df
+
 
 def main():
     # Paths to the source data and metadata
@@ -102,8 +127,11 @@ def main():
     for source in sorted_sources[1:]:
         pyxis_match_table = match_sources(pyxis_match_table, source)
     
+    # Filter and reorganize the Pyxis Match Table
+    filtered_df = filter_pyxis_match(pyxis_match_table, 'anp2024', ['wm2022','anp2024','gogi2023'])
+
     # Save the Pyxis Match Table
-    pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table.csv', index=False)
+    filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv', index=False)
 
 if __name__ == '__main__':
     main()
