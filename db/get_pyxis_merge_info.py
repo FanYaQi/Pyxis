@@ -105,49 +105,16 @@ def merge_data(pyxis_match_table, source_info_tables, merge_rules):
     return pd.DataFrame(detailed_merge)
 
 
-# def main():
-#     # File paths
-#     merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
-#     pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv'
-#     source_info_paths = {
-#         'zhan2021':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
-#         'wm2022':f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
-#         'anp2024':f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
-#         'gogi2023':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
-#     }
-
-#     # Load data
-#     merge_rules = load_merge_rules(merge_rules_path)
-#     pyxis_match_table = load_data(pyxis_match_path)
-#     source_info_tables = {id: load_data(path) for id, path in source_info_paths.items()}
-
-#     # Merge the data
-#     merged_info_table = merge_data(pyxis_match_table, source_info_tables, merge_rules)
-
-#     # Save the merged table
-#     merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered.csv', index=False)
-
 def main():
     # File paths
     merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
-    pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_12paper.csv'
+    pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv'
     source_info_paths = {
         'zhan2021':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
         'wm2022':f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
         'anp2024':f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
-        'gogi2023':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv',
-        'spe-210009-ms':f'{DATA_PATH}/br_geodata/data_standardization/spe-210009-ms.csv',
-        'spe-162323-ms':f'{DATA_PATH}/br_geodata/data_standardization/spe-162323-ms.csv',
-        'spe-140145-ms':f'{DATA_PATH}/br_geodata/data_standardization/spe-140145-ms.csv',
-        'spe-94706-ms':f'{DATA_PATH}/br_geodata/data_standardization/spe-94706-ms.csv',
-        'seg-2018-2990024':f'{DATA_PATH}/br_geodata/data_standardization/seg-2018-2990024.csv',
-        'seg-2005-2645':f'{DATA_PATH}/br_geodata/data_standardization/seg-2005-2645.csv',
-        'otc-31900-ms':f'{DATA_PATH}/br_geodata/data_standardization/otc-31900-ms.csv',
-        'otc-30780-ms':f'{DATA_PATH}/br_geodata/data_standardization/otc-30780-ms.csv',
-        'otc-22612-ms':f'{DATA_PATH}/br_geodata/data_standardization/otc-22612-ms.csv',
-        'otc-21934-ms':f'{DATA_PATH}/br_geodata/data_standardization/otc-21934-ms.csv',
-        'otc-8879-ms':f'{DATA_PATH}/br_geodata/data_standardization/otc-8879-ms.csv',
-        'arma-10-162':f'{DATA_PATH}/br_geodata/data_standardization/arma-10-162.csv'}
+        'gogi2023':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
+    }
 
     # Load data
     merge_rules = load_merge_rules(merge_rules_path)
@@ -158,7 +125,57 @@ def main():
     merged_info_table = merge_data(pyxis_match_table, source_info_tables, merge_rules)
 
     # Save the merged table
-    merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_12paper.csv', index=False)
+    merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered.csv', index=False)
+
+def main_iter():
+    # File paths
+    merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
+    
+    # Paths for Pyxis match tables for all five versions
+    version_paths = {
+        'v1': f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v1.csv',
+        'v2': f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v2.csv',
+        'v3': f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v3.csv',
+        'v4': f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v4.csv',
+        'v5': f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v5.csv'
+    }
+
+    # Paths for source data
+    source_info_paths = {
+        'zhan2021': f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+        'wm2022': f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
+        'anp2024': f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+        'gogi2023': f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv',
+        'spe-210009-ms': f'{DATA_PATH}/br_geodata/data_standardization/spe-210009-ms.csv',
+        'spe-162323-ms': f'{DATA_PATH}/br_geodata/data_standardization/spe-162323-ms.csv',
+        'spe-140145-ms': f'{DATA_PATH}/br_geodata/data_standardization/spe-140145-ms.csv',
+        'spe-94706-ms': f'{DATA_PATH}/br_geodata/data_standardization/spe-94706-ms.csv',
+        'seg-2018-2990024': f'{DATA_PATH}/br_geodata/data_standardization/seg-2018-2990024.csv',
+        'seg-2005-2645': f'{DATA_PATH}/br_geodata/data_standardization/seg-2005-2645.csv',
+        'otc-31900-ms': f'{DATA_PATH}/br_geodata/data_standardization/otc-31900-ms.csv',
+        'otc-30780-ms': f'{DATA_PATH}/br_geodata/data_standardization/otc-30780-ms.csv',
+        'otc-22612-ms': f'{DATA_PATH}/br_geodata/data_standardization/otc-22612-ms.csv',
+        'otc-21934-ms': f'{DATA_PATH}/br_geodata/data_standardization/otc-21934-ms.csv',
+        'otc-8879-ms': f'{DATA_PATH}/br_geodata/data_standardization/otc-8879-ms.csv',
+        'arma-10-162': f'{DATA_PATH}/br_geodata/data_standardization/arma-10-162.csv'
+    }
+
+    # Load merge rules and source data
+    merge_rules = load_merge_rules(merge_rules_path)
+    source_info_tables = {id: load_data(path) for id, path in source_info_paths.items()}
+
+    # Iterate through all versions of Pyxis match tables and create merged tables
+    for version, pyxis_match_path in version_paths.items():
+        # Load Pyxis match table for the version
+        pyxis_match_table = load_data(pyxis_match_path)
+        
+        # Merge the data using the merge rules
+        merged_info_table = merge_data(pyxis_match_table, source_info_tables, merge_rules)
+        
+        # Save the merged table for the version
+        output_path = f'{DATA_PATH}/br_geodata/pyxis_middle_version/merged_pyxis_field_info_table_{version}.csv'
+        merged_info_table.to_csv(output_path, index=False)
+        print(f'Saved merged Pyxis field info table for {version} at {output_path}')
 
 if __name__ == '__main__':
-    main()
+    main_iter()

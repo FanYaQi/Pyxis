@@ -128,10 +128,80 @@ def main():
         pyxis_match_table = match_sources(pyxis_match_table, source)
     
     # Filter and reorganize the Pyxis Match Table
-    filtered_df = filter_pyxis_match(pyxis_match_table, 'anp2024', ['wm2022','anp2024','gogi2023'])
+    filtered_df = filter_pyxis_match(pyxis_match_table, 'anp2024', ['wm2022','zhan2021','gogi2023'])
 
     # Save the Pyxis Match Table
-    filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv', index=False)
+    filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered_withwm.csv', index=False)
+
+def main_wowm():
+    # Load metadata and source data
+    metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
+    metadata = load_metadata(metadata_path)
+    metadata = metadata[metadata['Source ID'] != 'wm2022']  # Exclude wm source from metadata
+
+    # Load the source data for the remaining files
+    data_files = [
+        f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+        # f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',  # wm.csv is not included
+        f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+        f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
+    ]
+    sources = [load_source_data(Path(data_file)) for data_file in data_files]
+
+    # Sort sources by their data scores in the filtered metadata
+    sorted_metadata = sort_sources_by_score(metadata)
+    sorted_sources = [
+        next(src for src in sources if src['Source ID'].iloc[0] == id) 
+        for id in sorted_metadata['Source ID']
+    ]
+    
+    # Initialize the Pyxis Match Table
+    pyxis_match_table = initialize_pyxis_match_table(sorted_sources[0])
+    
+    # Iteratively match each source to the Pyxis Match Table
+    for source in sorted_sources[1:]:
+        pyxis_match_table = match_sources(pyxis_match_table, source)
+    
+    # Filter and reorganize the Pyxis Match Table
+    filtered_df = filter_pyxis_match(pyxis_match_table, 'anp2024', ['zhan2021','gogi2023'])
+
+    # Save the Pyxis Match Table
+    filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered_wowm.csv', index=False)
+
+def main_iter():
+    # Paths to the source data and metadata
+    metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
+    data_files = {
+        'zhan': f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+        'wm': f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
+        'anp': f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+        'gogi': f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
+    }
+    
+    # Load metadata and source data
+    metadata = load_metadata(metadata_path)
+    sources = {name: load_source_data(Path(data_file)) for name, data_file in data_files.items()}
+    
+    # Sort sources by their data scores in the metadata
+    sorted_metadata = sort_sources_by_score(metadata)
+    sorted_sources = [next(src for key, src in sources.items() if src['Source ID'].iloc[0] == id) for id in sorted_metadata['Source ID']]
+    
+    # Define versions with increasing number of sources using sorted sources
+    versions = {
+        f'v{i+1}': sorted_sources[:i+1] for i in range(len(sorted_sources))
+    }
+    
+    # Iterate through versions and create Pyxis Match Table for each
+    for version, selected_sources in versions.items():
+        # Initialize the Pyxis Match Table with the first source
+        pyxis_match_table = initialize_pyxis_match_table(selected_sources[0])
+        
+        # Iteratively match each source to the Pyxis Match Table
+        for source in selected_sources[1:]:
+            pyxis_match_table = match_sources(pyxis_match_table, source)
+  
+        # Save the Pyxis Match Table for the current version
+        pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_{version}.csv', index=False)
 
 if __name__ == '__main__':
-    main()
+    main_iter()

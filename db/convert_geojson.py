@@ -1,6 +1,6 @@
 import geopandas as gpd
 import pandas as pd
-from pathlib2 import Path
+# from pathlib2 import Path
 import os
 from shapely.geometry import Point
 

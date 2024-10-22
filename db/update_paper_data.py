@@ -112,13 +112,11 @@ if __name__ == '__main__':
   sources = [load_source_data(Path(data_file)) for data_file in data_files]
   
   # Read current the Pyxis Match Table
-  pyxis_match_table = pd.read_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv')
-  # pyxis_match_table = pd.read_csv('./data/br_geodata/pyxis_match_table_filtered.csv')
+  pyxis_match_table = pd.read_csv(f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v4.csv')
   
   # Iteratively match each source to the Pyxis Match Table
   for source in sources:
       pyxis_match_table = match_sources(pyxis_match_table, source)
   
   # Save the Pyxis Match Table
-  pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_12paper.csv', index=False)
-  # pyxis_match_table.to_csv('./data/br_geodata/pyxis_match_table_12paper.csv', index=False)
+  pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_v5.csv', index=False)

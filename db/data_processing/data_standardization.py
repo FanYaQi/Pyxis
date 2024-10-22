@@ -1,5 +1,6 @@
 import os
 import json
+import numpy as np
 from abc import ABC
 import pandas as pd
 import h3
@@ -8,6 +9,7 @@ import uuid
 from unidecode import unidecode
 
 ##note: give output for the source metadata table and source info table
+m3toscf = 35.31466657
 
 with open('./db/data/OPGEE_cols.json', 'r') as json_file:
     OPGEE_cols = json.load(json_file)
@@ -67,10 +69,88 @@ def process_ppm2pc(input):
     return input*0.0001
 
 ###for anp
-def process_getyr(input):
+def process_bin(input):
     if input is not None:
-        return input[0:4]
+        if input > 0:
+            return 1
+        else:
+            return 0
+    else:
+        return None
     
+def process_bin_2(input1, input2):
+    i1 = process_bin(input1)
+    i2 = process_bin(input2)
+    if i1 == 1 or i2 == 1:
+        return 1
+    elif i1 is None and i2 is None:
+        return None
+    else:
+        return 0
+    
+def process_round(input):
+    if input is not None:
+        return np.ceil(input)
+
+def process_calgor(gas,oil):
+    if gas is not None and oil is not None and oil != 0:
+        return gas*6000/oil
+
+def process_calwr(water,oil):
+    #bbl water/bbl oil
+    if water is not None and oil is not None and oil != 0:
+        return water/oil
+
+def process_calwir(water_in, oil):
+    #Water injection ratio (bbl water/bbl oil
+    if water_in is not None and oil is not None and oil != 0:
+        return water_in*1000/(6.28981*oil)
+    
+def process_calglr(lift,oil):
+    #Gas lifting injection ratio （scf/bbl liquid
+    if lift is not None and oil is not None and oil != 0:
+        return lift*1000*m3toscf/oil
+
+def process_calgfr(co2, n2, oil):
+    #Gas flooding injection ratio (scf/bbl oil)
+    # Check if co2 and n2 are not None, oil is not None and non-zero
+    if co2 is not None and n2 is not None and oil is not None and oil != 0:
+        return (co2 + n2) * 1000* m3toscf/ oil
+    return None  # Optional: return None if the conditions are not met
+
+def process_fg(co2,n2):
+    # Dictionary to hold valid values with their corresponding return codes
+    valid_values = {
+        # 1: ng if ng is not None and ng > 0 else float('-inf'),
+        2: n2 if n2 is not None and n2 > 0 else float('-inf'),
+        3: co2 if co2 is not None and co2 > 0 else float('-inf')
+    }
+    
+    # Find the largest valid value's key and return it if it's greater than zero
+    largest = max(valid_values, key=valid_values.get)
+    return largest if valid_values[largest] > 0 else None
+
+def process_calsor(steam,oil):
+    if steam is not None and oil is not None and oil != 0:
+        return steam*8.14/oil # 1 t to bbl
+    
+def process_offtag2bin_anp(input):
+    if input is not None and isinstance(input, str):
+        if unidecode(input.lower()) in ('earth'):
+            return 0
+        elif unidecode(input.lower()) in ('sea'):
+            return 1
+        
+def process_pcg(inject, available,receive,consume,transfer):
+    t = available + receive - consume - transfer
+    if inject is not None and t is not None and t > 0:
+        return inject/t
+
+def process_pcw(inject, prod):
+    if inject is not None and prod is not None and prod != 0:
+        return inject/prod
+
+###for gogi
 def process_function_unit_pt(input):
     if input is not None and isinstance(input, str):
         if unidecode(input.lower()) in ('oleo'):
@@ -79,21 +159,6 @@ def process_function_unit_pt(input):
             return 'gas'
     return None
 
-def process_calgor(gas,oil):
-    if gas is not None and oil is not None and oil != 0:
-        return gas*6000/oil
-
-def process_calwor(water,oil):
-    if water is not None and oil is not None and oil != 0:
-        return water/oil
-
-def process_offtag2bin_anp(input):
-    if input is not None and isinstance(input, str):
-        if unidecode(input.lower()) in ('Earth'):
-            return 0
-        elif unidecode(input.lower()) in ('Sea'):
-            return 1
-###for gogi
 def process_getyr_gogi(input):
     if input is not None:
         return input[6:10]
@@ -125,16 +190,29 @@ op_table = {
     'Gas-to-oil ratio (GOR)':(['f_gas_oil_'],process_keep)
   },
   'anp':{
-    'Original ID':(['Field_ID'],process_keep),
-    'Field name': (['NOM_CAMPO'], process_keep),
-    'Function unit': (['FLUIDO_PRI'], process_function_unit_pt),
-    'Field age':(['Start of P'],process_getyr),
+    'Original ID':(['Field ID'],process_keep),
+    'Field name': (['Field name'], process_keep),
+    'Function unit': (['Function u'], process_function_unit),
+    'Water reinjection': (['Water In 2'], process_bin),
+    'Natural gas reinjection': (['Gas In 2nd'], process_bin),
+    'Gas lifting':(['Gas Lift ('], process_bin),
+    'Steam flooding':(['Steam Inje'],process_bin),
+    'Gas flooding':(['CO₂ Inje','Nitrogen I'],process_bin_2),
+    'Field age':(['Field age'],process_keep),
+    'Field depth':(['Field dept'],process_mtr2ft),
+    'Number of producing wells':(['no. Produc'], process_round),
+    'Offshore':(['Offshore'],process_offtag2bin_anp),
+    'API gravity (oil at standard pressure and temperature, or "dead oil")':(['API'],process_keep),
     'Oil production volume':(['Oil (bbl/d'],process_keep),
     'Gas-to-oil ratio (GOR)':(['Natural Ga','Oil (bbl/d'],process_calgor),
-    'Water-to-oil ratio (WOR)':(['Water (bbl','Oil (bbl/d'],process_calwor),
-    'Number of producing wells':(['Number of'],process_keep),
-    'Offshore':(['Location_x'],process_offtag2bin_anp),
-    'API gravity (oil at standard pressure and temperature, or "dead oil")':(['API Petrol'],process_keep)
+    'Water-to-oil ratio (WOR)':(['Water (bbl','Oil (bbl/d'],process_calwr),
+    'Water injection ratio':(['Water In 2','Oil (bbl/d'],process_calwir),
+    'Gas lifting injection ratio':(['Gas Lift (','Oil (bbl/d'],process_calglr),
+    'Gas flooding injection ratio':(['CO₂ Inje','Nitrogen I','Oil (bbl/d'],process_calgfr),
+    'Flood gas':(['CO₂ Inje','Nitrogen I'],process_fg),
+    'Steam-to-oil ratio (SOR)':(['Steam Inje','Oil (bbl/d'],process_calsor),
+    'Fraction of remaining natural gas reinjected':(['Gas In 2nd', 'Available','Gas Receiv','Internal G','Gas Transf'],process_pcg),
+    'Fraction of produced water reinjected':(['Water In 2','Water (bbl'],process_pcw)
   },
   'gogi':{
     'Original ID':(['MD_Fkey'],process_keep),
@@ -253,7 +331,7 @@ def main():
     print(wm.metadata)
     wm_source_table.to_csv('./db/data/br_geodata/data_standardization/wm.csv')
 
-    anp_data = gpd.read_file("./db/data/br_geodata/anp/BR_cleaned.shp")
+    anp_data = gpd.read_file("./db/data/br_geodata/anp/raw/combined_anp_data.shp")
     anp = DataSource(data=anp_data,name ='anp', n_explain = 'National Agency for Petroleum, Natural Gas and Biofuels', type = 'government', time = '2024',
                     url='https://www.gov.br/anp/pt-br/assuntos/exploracao-e-producao-de-oleo-e-gas/dados-tecnicos',
                     config=op_table['anp'])
