@@ -10,6 +10,7 @@ from unidecode import unidecode
 
 ##note: give output for the source metadata table and source info table
 m3toscf = 35.31466657
+boe2tm3 = 0.1647 # boe natural gas to thousand m3
 
 with open('./db/data/OPGEE_cols.json', 'r') as json_file:
     OPGEE_cols = json.load(json_file)
@@ -54,7 +55,7 @@ def parse_production_methods(row, production_method_col):
 
 def process_mtr2ft(input):
     return input*3.28084
-
+    
 def process_kbl2bbl(input):
     return input*1000
 
@@ -104,24 +105,26 @@ def process_calwr(water,oil):
 def process_calwir(water_in, oil):
     #Water injection ratio (bbl water/bbl oil
     if water_in is not None and oil is not None and oil != 0:
-        return water_in*1000/(6.28981*oil)
+        return water_in*6.28981/oil
     
 def process_calglr(lift,oil):
     #Gas lifting injection ratio （scf/bbl liquid
     if lift is not None and oil is not None and oil != 0:
         return lift*1000*m3toscf/oil
 
-def process_calgfr(co2, n2, oil):
-    #Gas flooding injection ratio (scf/bbl oil)
-    # Check if co2 and n2 are not None, oil is not None and non-zero
-    if co2 is not None and n2 is not None and oil is not None and oil != 0:
-        return (co2 + n2) * 1000* m3toscf/ oil
-    return None  # Optional: return None if the conditions are not met
+def process_calgfr(ng, co2, n2, oil):
+    # Gas flooding injection ratio (scf/bbl oil)
+    # Ensure oil is not None and non-zero
+    if oil is not None and oil != 0:
+        # Sum only the gases that are not None
+        total_gas = sum(gas for gas in [ng, co2, n2] if gas is not None)
+        return total_gas * 1000 * m3toscf / oil
+    return None  # Optional: return None if the oil condition is not met
 
-def process_fg(co2,n2):
+def process_fg(ng,co2,n2):
     # Dictionary to hold valid values with their corresponding return codes
     valid_values = {
-        # 1: ng if ng is not None and ng > 0 else float('-inf'),
+        1: ng if ng is not None and ng > 0 else float('-inf'),
         2: n2 if n2 is not None and n2 > 0 else float('-inf'),
         3: co2 if co2 is not None and co2 > 0 else float('-inf')
     }
@@ -141,8 +144,8 @@ def process_offtag2bin_anp(input):
         elif unidecode(input.lower()) in ('sea'):
             return 1
         
-def process_pcg(inject, available,receive,consume,transfer):
-    t = available + receive - consume - transfer
+def process_pcg(inject, produce,receive,consume,transfer,flare):
+    t = produce*boe2tm3 + receive - consume - transfer - flare
     if inject is not None and t is not None and t > 0:
         return inject/t
 
@@ -182,7 +185,7 @@ op_table = {
     'Number of water injecting wells':(['waterw_cnt'],process_keep),
     'Field depth':(['f_depth_mt'],process_mtr2ft),
     'Field age':(['field_year'],process_keep),
-    'Oil production volume':(['f_producti'],process_kbl2bbl),
+    'Oil production volume':(['f_produc_2'],process_kbl2bbl),
     'Offshore':(['onshore_of'],process_offtag2bin),
     'API gravity (oil at standard pressure and temperature, or "dead oil")':(['f_api__api'],process_keep),
     'CO2':(['f_co2__prc'],process_keep),
@@ -208,10 +211,10 @@ op_table = {
     'Water-to-oil ratio (WOR)':(['Water (bbl','Oil (bbl/d'],process_calwr),
     'Water injection ratio':(['Water In 2','Oil (bbl/d'],process_calwir),
     'Gas lifting injection ratio':(['Gas Lift (','Oil (bbl/d'],process_calglr),
-    'Gas flooding injection ratio':(['CO₂ Inje','Nitrogen I','Oil (bbl/d'],process_calgfr),
-    'Flood gas':(['CO₂ Inje','Nitrogen I'],process_fg),
+    'Gas flooding injection ratio':(['Gas In 2nd','CO₂ Inje','Nitrogen I','Oil (bbl/d'],process_calgfr),
+    'Flood gas':(['Gas In 2nd','CO₂ Inje','Nitrogen I'],process_fg),
     'Steam-to-oil ratio (SOR)':(['Steam Inje','Oil (bbl/d'],process_calsor),
-    'Fraction of remaining natural gas reinjected':(['Gas In 2nd', 'Available','Gas Receiv','Internal G','Gas Transf'],process_pcg),
+    'Fraction of remaining natural gas reinjected':(['Gas In 2nd', 'Natural Ga','Gas Receiv','Internal G','Gas Transf','Gas Flarin'],process_pcg),
     'Fraction of produced water reinjected':(['Water In 2','Water (bbl'],process_pcw)
   },
   'gogi':{

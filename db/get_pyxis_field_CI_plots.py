@@ -3,38 +3,16 @@ import geopandas as gpd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-from openpyxl import load_workbook
+from utils.analysis_util import load_opgee_results
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from matplotlib.colors import LinearSegmentedColormap
 from utils.path_util import DATA_PATH
 from shapely import wkt
 
-def load_opgee_results(filepath):
-    wb = load_workbook(filepath, data_only=True)
-    ws = wb['Results']
-    num_fields = 269  # Updated to use a fixed number of fields
-    field_names = [ws.cell(row=21, column=i).value for i in range(8, 8 + num_fields)]
-    
-    # Extract oil production and lifecycle GHG emissions data
-    oil_production = [ws.cell(row=24, column=i).value for i in range(8, 8 + num_fields)]
-    lifecycle_GHG_emissions = [ws.cell(row=193, column=i).value for i in range(8, 8 + num_fields)]
-    
-    # Create a DataFrame to store the extracted data
-    data = {
-        'Field name': field_names,
-        'Oil Production': oil_production,
-        'Lifecycle GHG Emissions': lifecycle_GHG_emissions
-    }
-    results_df = pd.DataFrame(data)
-    return results_df
-
 def load_basin_shapefile(filepath):
     basin_gdf = gpd.read_file(filepath)
-    basin_gdf['basin_name'] = basin_gdf['name'].str.replace(r'_Mar$', '_Offshore', regex=True)
-    basin_gdf['basin_name'] = basin_gdf['basin_name'].str.replace(r'_Terra$', '_Onshore', regex=True)
-    merged_basins_gdf = basin_gdf.dissolve(by='basin_name').reset_index()
-    return merged_basins_gdf
+    return basin_gdf
 
 def load_pyxis_data(filepath):
     pyxis_data = pd.read_csv(filepath)
@@ -46,7 +24,24 @@ def load_flare_data(filepath):
     flare_data = pd.read_csv(filepath)
     return flare_data
 
-def prepare_merged_with_basin_gdf(results_df, pyxis_fields_gdf, basin_gdf, flare_data):
+def prepare_merged_with_basin_gdf_for_impact(results_df, pyxis_fields_gdf, basin_gdf, flare_data):
+    # Prepare basin_gdf without suffixes for impact plot purposes
+    basin_gdf['basin_name'] = basin_gdf['name'].str.replace(r'(_Mar|_Terra)$', '', regex=True)
+    merged_basins_gdf = basin_gdf.dissolve(by='basin_name').reset_index()
+    
+    merged_gdf = pd.merge(results_df, pyxis_fields_gdf, on='Field name', how='left')
+    merged_gdf = gpd.GeoDataFrame(merged_gdf, geometry='geometry', crs=pyxis_fields_gdf.crs)
+    merged_basins_gdf = merged_basins_gdf.to_crs(merged_gdf.crs)
+    merged_with_basin_gdf = gpd.sjoin(merged_gdf, merged_basins_gdf, how='left', predicate='within')
+    merged_with_basin_gdf = merged_with_basin_gdf[['Field name', 'Pyxis ID', 'Oil Production', 'Lifecycle GHG Emissions', 'basin_name', 'Gas-to-oil ratio (GOR)', 'Offshore']].merge(
+        flare_data[['Pyxis ID', 'Flaring-to-oil ratio']], on='Pyxis ID', how='left')
+    return merged_with_basin_gdf
+
+def prepare_merged_with_basin_gdf_for_basin(basin_gdf, results_df, pyxis_fields_gdf, flare_data):
+    # Prepare basin_gdf with onshore/offshore suffix for basin plot purposes
+    basin_gdf['basin_name'] = basin_gdf['name'].str.replace(r'_Mar$', '_Offshore', regex=True)
+    basin_gdf['basin_name'] = basin_gdf['basin_name'].str.replace(r'_Terra$', '_Onshore', regex=True)
+    
     merged_gdf = pd.merge(results_df, pyxis_fields_gdf, on='Field name', how='left')
     merged_gdf = gpd.GeoDataFrame(merged_gdf, geometry='geometry', crs=pyxis_fields_gdf.crs)
     basin_gdf = basin_gdf.to_crs(merged_gdf.crs)
@@ -67,9 +62,9 @@ def prepare_basin_avg(merged_with_basin_gdf):
     basin_avg['average_FOR'].fillna(0, inplace=True)
     return basin_avg
 
-def create_impact_plot(merged_with_basin_gdf, output_path):
-    plt.rcParams['font.family'] = 'Helvetica'
-    plt.rcParams['font.size'] = 12
+def create_impact_plot(merged_with_basin_gdf, output_path, version=""):
+    plt.rcParams['font.family'] = 'Arial'
+    plt.rcParams['font.size'] = 14
     
     merged_with_basin_gdf['Impact'] = merged_with_basin_gdf['Oil Production'] * merged_with_basin_gdf['Lifecycle GHG Emissions']
     conditions = [
@@ -132,7 +127,7 @@ def create_impact_plot(merged_with_basin_gdf, output_path):
         Patch(facecolor='white', edgecolor='k', hatch='', label='Other Basins')
     ]
     
-    plt.legend(handles=legend_handles + hatch_legend, title="GOR and Basin Categories", frameon=False)
+    plt.legend(handles=legend_handles + hatch_legend, title="GOR and Basin Categories", frameon=False, loc='upper left')
     
     ax1 = plt.gca()
     ax2 = ax1.twiny()
@@ -146,28 +141,49 @@ def create_impact_plot(merged_with_basin_gdf, output_path):
     ax2.set_xlabel("Cumulative Oil Production (thousand bbl/d)")
     ax2.tick_params(direction='in')
     
-    plt.savefig(output_path, format='svg', dpi=300)
+    plt.savefig(output_path, format='png', dpi=300)
     plt.show()
+    return volume_weighted_avg_CI
 
-def create_basin_plots(basin_gdf_mt, basin_avg, output_path):
-    plt.rcParams['font.family'] = 'Helvetica'
-    plt.rcParams['font.size'] = 13
+def create_basin_plots(basin_shapefile, basin_avg, output_path,volume_weighted_avg_CI):
+    plt.rcParams['font.family'] = 'Arial'
+    plt.rcParams['font.size'] = 14
 
-    volume_weighted_avg_CI = basin_avg['volume_weighted_CI'].mean()
+    # # Calculate volume-weighted average CI based on production volumes
+    # volume_weighted_avg_CI = (basin_avg['volume_weighted_CI'] * basin_avg['total_production']).sum() / basin_avg['total_production'].sum()
+
+    # Sort basin_avg by total production volume
+    basin_avg = basin_avg.sort_values(by='total_production', ascending=False)
 
     fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, figsize=(20, 10), dpi=300, gridspec_kw={'width_ratios': [1, 1, 2.5]})
 
-    bars1 = ax1.barh(basin_avg['basin_name'], basin_avg['volume_weighted_CI'], color=['#B1040E' if status else "#006CB8" for status in basin_avg['offshore_status']], edgecolor='k')
+    # Plot the volume-weighted CI
+    offshore_color = "#006CB8"  # Blue for offshore
+    onshore_color = '#B1040E'  # Red for onshore
+    bars1 = ax1.barh(basin_avg['basin_name'], basin_avg['volume_weighted_CI'], color=[offshore_color if status else onshore_color for status in basin_avg['offshore_status']], edgecolor='k')
     ax1.axvline(x=volume_weighted_avg_CI, color='black', linestyle='--', linewidth=1, label=f'Avg CI: {volume_weighted_avg_CI:.2f}')
     ax1.set_xlabel('Volume-Weighted Average CI (gCO$_2$eq/MJ)')
     ax1.invert_yaxis()
 
-    ax2.barh(basin_avg['basin_name'], basin_avg['total_production'], color='#008566', edgecolor='k')
-    ax2.set_xlabel('Oil Production (million bbl/d)')
-    ax2.invert_yaxis()
+    # Add legend
+    offshore_patch = Patch(color=offshore_color, label='Offshore')
+    onshore_patch = Patch(color=onshore_color, label='Onshore')
+    handles, labels = ax1.get_legend_handles_labels()
+    handles.extend([offshore_patch, onshore_patch])
+    ax1.legend(handles=handles, loc='lower right')
 
-    if 'ax3' in locals():
-        ax3.remove()
+    # Plot the total production
+    bars2 = ax2.barh(basin_avg['basin_name'], basin_avg['total_production'], color='#008566', edgecolor='k')
+    ax2.set_xlabel('Oil Production (bbl/d)')
+    ax2.invert_yaxis()
+    ax2.set_yticklabels([])
+
+    # Plot the map with the basin shapefiles and average_FOR values
+    basin_gdf = gpd.read_file(basin_shapefile)
+    basin_gdf['basin_name'] = basin_gdf['name'].str.replace(r'_Mar$', '_Offshore', regex=True)
+    basin_gdf['basin_name'] = basin_gdf['basin_name'].str.replace(r'_Terra$', '_Onshore', regex=True)
+    basin_gdf_mt = basin_gdf.merge(basin_avg, left_on='basin_name', right_on='basin_name', how='inner')
+
     ax3 = plt.subplot(133, projection=ccrs.PlateCarree())
     ax3.set_extent([-75, -30, -35, 10])
     ax3.add_feature(cfeature.LAND, zorder=0, edgecolor='black', facecolor='white', alpha=0.3)
@@ -175,7 +191,7 @@ def create_basin_plots(basin_gdf_mt, basin_avg, output_path):
     ax3.add_feature(cfeature.BORDERS, linestyle=':')
 
     cmap = LinearSegmentedColormap.from_list("custom_cmap", ["#e9c716", '#bc272d'])
-    norm = plt.Normalize(basin_avg['average_FOR'].min(), basin_avg['average_FOR'].max())
+    norm = plt.Normalize(basin_gdf_mt['average_FOR'].min(), basin_gdf_mt['average_FOR'].max())
 
     basin_gdf_mt.plot(column='average_FOR', cmap=cmap, linewidth=0.8, ax=ax3, edgecolor='1', legend=False, zorder=2)
     for idx, row in basin_gdf_mt.iterrows():
@@ -186,30 +202,36 @@ def create_basin_plots(basin_gdf_mt, basin_avg, output_path):
     cbar = fig.colorbar(sm, ax=ax3, orientation='vertical', fraction=0.05, pad=0.05)
     cbar.set_label('Average FOR (scf/bbl)')
 
+    fig.text(0.7, 0.07, 'Basin Level Flaring-to-Oil Ratio (FOR)', ha='center', fontsize=12)
+
+    # Adjust layout
     plt.subplots_adjust(wspace=0.1)
-    plt.savefig(output_path, format='svg', dpi=300)
+    plt.savefig(output_path, format='png', dpi=300)
     plt.show()
 
 def main():
-    excel_path = f'{DATA_PATH}/OPGEE_model/OPGEE_3.0b_BETA_BR.xlsm'
+    version = 'withwm'
+    excel_path = f'{DATA_PATH}/OPGEE_model/OPGEE_3.0c_BETA_BR_'+version+'.xlsm'
     basin_shapefile = f'{DATA_PATH}/br_geodata/br_basin_shp/bacias_gishub_db.shp'
-    pyxis_data_path = f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered.csv'
-    flare_data_path = f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_with_flare.csv'
-    impact_plot_output_path = f'{DATA_PATH}/br_geodata/plots/Field_CI_Plot_GOR_Basin_old.svg'
-    basin_plot_output_path = f'{DATA_PATH}/br_geodata/plots/Basin_CI_Plot_with_production_and_for_old.svg'
+    pyxis_data_path = f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered_'+version+'.csv'
+    flare_data_path = f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_with_flare_'+version+'.csv'
+    impact_plot_output_path = f'{DATA_PATH}/br_geodata/plots/Field_CI_Plot_GOR_Basin_'+version+'.png'
+    basin_plot_output_path = f'{DATA_PATH}/br_geodata/plots/Basin_CI_Plot_with_production_and_for_'+version+'.png'
 
-    results_df = load_opgee_results(excel_path)
+    results_df = load_opgee_results(excel_path,279)
     basin_gdf = load_basin_shapefile(basin_shapefile)
     pyxis_fields_gdf = load_pyxis_data(pyxis_data_path)
     flare_data = load_flare_data(flare_data_path)
 
-    # Prepare merged_with_basin_gdf and basin_avg using separate functions
-    merged_with_basin_gdf = prepare_merged_with_basin_gdf(results_df, pyxis_fields_gdf, basin_gdf, flare_data)
-    basin_avg = prepare_basin_avg(merged_with_basin_gdf)
+    # Prepare merged_with_basin_gdf for impact plot
+    merged_with_basin_gdf_impact = prepare_merged_with_basin_gdf_for_impact(results_df, pyxis_fields_gdf, basin_gdf, flare_data)
+    # Prepare merged_with_basin_gdf for basin plot
+    merged_with_basin_gdf_basin = prepare_merged_with_basin_gdf_for_basin(basin_gdf, results_df, pyxis_fields_gdf, flare_data)
+    basin_avg = prepare_basin_avg(merged_with_basin_gdf_basin)
 
     # Create plots
-    create_impact_plot(merged_with_basin_gdf, impact_plot_output_path)
-    create_basin_plots(basin_gdf, basin_avg, basin_plot_output_path)
+    volume_weighted_avg_CI =create_impact_plot(merged_with_basin_gdf_impact, impact_plot_output_path,'with WM')
+    create_basin_plots(basin_shapefile, basin_avg, basin_plot_output_path,volume_weighted_avg_CI)
 
 if __name__ == "__main__":
     main()

@@ -108,7 +108,7 @@ def merge_data(pyxis_match_table, source_info_tables, merge_rules):
 def main():
     # File paths
     merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
-    pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered.csv'
+    pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered_withwm.csv'
     source_info_paths = {
         'zhan2021':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
         'wm2022':f'{DATA_PATH}/br_geodata/data_standardization/wm.csv',
@@ -125,7 +125,28 @@ def main():
     merged_info_table = merge_data(pyxis_match_table, source_info_tables, merge_rules)
 
     # Save the merged table
-    merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered.csv', index=False)
+    merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered_withwm.csv', index=False)
+
+def main_wowm():
+    # File paths
+    merge_rules_path = f'{DATA_PATH}/OPGEE_cols_merge_rules.json'
+    pyxis_match_path = f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered_wowm.csv'
+    source_info_paths = {
+        'zhan2021':f'{DATA_PATH}/br_geodata/data_standardization/zhan.csv',
+        'anp2024':f'{DATA_PATH}/br_geodata/data_standardization/anp.csv',
+        'gogi2023':f'{DATA_PATH}/br_geodata/data_standardization/gogi.csv'
+    }
+
+    # Load data
+    merge_rules = load_merge_rules(merge_rules_path)
+    pyxis_match_table = load_data(pyxis_match_path)
+    source_info_tables = {id: load_data(path) for id, path in source_info_paths.items()}
+
+    # Merge the data
+    merged_info_table = merge_data(pyxis_match_table, source_info_tables, merge_rules)
+
+    # Save the merged table
+    merged_info_table.to_csv(f'{DATA_PATH}/br_geodata/merged_pyxis_field_info_table_filtered_wowm.csv', index=False)
 
 def main_iter():
     # File paths
@@ -178,4 +199,4 @@ def main_iter():
         print(f'Saved merged Pyxis field info table for {version} at {output_path}')
 
 if __name__ == '__main__':
-    main_iter()
+    main()

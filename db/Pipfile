@@ -8,7 +8,7 @@ psycopg2 = "~=2.9.7"
 psycopg2-binary = "~=2.9.7"
 pandas = "~=2.0.3"
 h3 = "~=3.7.7"
-geopandas = "~=0.13.2"
+geopandas = "~=0.14.4"
 jupyter = "~=1.0.0"
 notebook = "~=7.0.2"
 matplotlib = "~=3.7.2"
@@ -21,6 +21,7 @@ scikit-learn = "~=1.4.2"
 folium = "~=0.16"
 cartopy = "~=0.23.0"
 contextily = "~=1.6.1"
+matplotlib-venn = "~=1.1.1"
 
 [dev-packages]
 

@@ -102,7 +102,7 @@ def match_flares_to_fields(flare_gdf, field_gdf):
     field_gdf['Flaring-to-oil ratio'] = field_gdf.apply(lambda row: combined_matches[combined_matches['index_right'] == row.name]['Flaring-to-oil ratio'].sum() if row.name in combined_matches['index_right'].values else row['Flaring-to-oil ratio'], axis=1)
 
     # Calculate final match rate and unmatched flare volume
-    final_match_volume = all_matches['weighted_volume'].sum()
+    final_match_volume = (field_gdf['Oil production volume'].apply(lambda x: x if pd.notna(x) and x > 0 else 1)*field_gdf['Flaring-to-oil ratio']).sum()*365/BCM2scf
     final_match_rate = final_match_volume / total_flare_volume if total_flare_volume != 0 else 0
     unmatched_flare_volume = 1 - final_match_rate
     
