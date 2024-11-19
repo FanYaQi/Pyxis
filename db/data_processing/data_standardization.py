@@ -96,6 +96,8 @@ def process_round(input):
 def process_calgor(gas,oil):
     if gas is not None and oil is not None and oil != 0:
         return gas*6000/oil
+    # if gas is not None and (oil is None or oil == 0): ## assign a small oil volume in order to keep gas 
+    #     return gas*6000/1
 
 def process_calwr(water,oil):
     #bbl water/bbl oil
@@ -340,7 +342,7 @@ def main():
                     config=op_table['anp'])
     anp.process()
     anp_source_table = anp.source_info_table()
-    anp.data_score([4.5,5,4])
+    anp.data_score([4.5,5,5])
     print(anp.metadata)
     anp_source_table.to_csv('./db/data/br_geodata/data_standardization/anp.csv')
 

@@ -133,6 +133,35 @@ def main():
     # Save the Pyxis Match Table
     filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_match_table_filtered_withwm.csv', index=False)
 
+def main_validation():
+    # Paths to the source data and metadata
+    metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
+    data_files = [f'{DATA_PATH}/br_geodata/data_standardization/zhan_10.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/wm_10.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/anp_10.csv',
+                  f'{DATA_PATH}/br_geodata/data_standardization/gogi_10.csv']
+    
+    # Load metadata and source data
+    metadata = load_metadata(metadata_path)
+    sources = [load_source_data(Path(data_file)) for data_file in data_files]
+    
+    # Sort sources by their data scores in the metadata
+    sorted_metadata = sort_sources_by_score(metadata)
+    sorted_sources = [next(src for src in sources if src['Source ID'].iloc[0] == id) for id in sorted_metadata['Source ID']]
+    
+    # Initialize the Pyxis Match Table
+    pyxis_match_table = initialize_pyxis_match_table(sorted_sources[0])
+    
+    # Iteratively match each source to the Pyxis Match Table
+    for source in sorted_sources[1:]:
+        pyxis_match_table = match_sources(pyxis_match_table, source)
+    
+    # Filter and reorganize the Pyxis Match Table
+    filtered_df = filter_pyxis_match(pyxis_match_table, 'anp2024', ['wm2022','zhan2021','gogi2023'])
+
+    # Save the Pyxis Match Table
+    filtered_df.to_csv(f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_validation_filtered_pipeline.csv', index=False)
+
 def main_wowm():
     # Load metadata and source data
     metadata_path = f'{DATA_PATH}/br_geodata/data_standardization/source_metadata.csv'
@@ -204,4 +233,4 @@ def main_iter():
         pyxis_match_table.to_csv(f'{DATA_PATH}/br_geodata/pyxis_middle_version/pyxis_match_table_{version}.csv', index=False)
 
 if __name__ == '__main__':
-    main_iter()
+    main_validation()
