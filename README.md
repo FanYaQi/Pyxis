@@ -1,7 +1,27 @@
 # Pyxis
-Pyxis project.
 
-## Prerequisites(on MacOS)
+A GIS-based data platform for oil and gas emissions monitoring. Pyxis integrates diverse data sources to consistently estimate and monitor greenhouse gas emissions in the oil and gas industry.
+
+## Docker Setup (Recommended)
+
+1. Clone the repository.
+2. Go under the `backend` directory. Copy `.env.example` to `.env` and update the configuration
+3. Build and run the Docker containers under `Pyxis` root folder:
+
+```bash
+docker-compose up -d
+```
+
+4. Initialize the database:
+
+```bash
+curl -X POST http://localhost:8000/data/init_db
+```
+
+5. Access the API at http://localhost:8000 and API documentation at http://localhost:8000/docs
+
+
+## Local Setup (macOS)
 
 1. PostgresSQL Database:
   - `brew install postgres`, then create a database called `pyxis`
@@ -28,16 +48,23 @@ pyxis=# \dx
 (5 rows)
 ```
 
-## Set Up PYTHON PATH
-1. Add python search path in .venv/bin/activate
+## Project Structure
 
-export PYTHONPATH = "/Users/yaqifan/Documents/Github/Pyxis/db"
+- `/scripts_n_notebooks`: Data processing scripts and utilities
+- `/backend`: FastAPI web application
+- `/docs`: Documentation and diagrams
 
-## Trouble shooting
+## API Endpoints
+
+- `/data/init_db`: Initialize database tables
+
+## Troubleshooting
 
 1. When installing `psycopg2`, `Error: pg_config executable not found.`:
 
 https://stackoverflow.com/questions/35104097/how-to-install-psycopg2-with-pg-config-error
 
-2. When write query in postgres, keep in mind to check the (x,y) coordinates for sequence of longitude and latitude.
+2. When writing queries in postgres, keep in mind to check the (x,y) coordinates for sequence of longitude and latitude.
+
+3. If you have issues with Docker setup, ensure Docker is running and ports 5432 and 8000 are available.
 

@@ -10,6 +10,13 @@ sqlalchemy = "*"
 geoalchemy2 = {extras = ["shapely"], version = "*"}
 psycopg2 = "*"
 python-dotenv = "*"
+pandas = "~=2.0.3"
+h3 = "~=3.7.7"
+shapely = "*"
+fuzzywuzzy = "~=0.18.0"
+matplotlib = "~=3.7.2"
+seaborn = "~=0.13.2"
+scikit-learn = "~=1.4.2"
 
 [dev-packages]
 black = "*"

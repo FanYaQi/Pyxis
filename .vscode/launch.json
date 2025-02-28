@@ -13,10 +13,9 @@
         "pyxis_app.main:app",
         "--reload"
       ],
-      "cwd": "${workspaceFolder}/web",
+      "cwd": "${workspaceFolder}/backend",
       "jinja": true,
       "justMyCode": true
-
     }
   ]
 }

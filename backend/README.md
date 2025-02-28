@@ -1,5 +1,5 @@
-# LearnFastAPI
-Repo to learn fast api.
+# Pyxis Project Backend
+Backend for project Pyxis.
 
 # Prerequisite
 Please install `pipenv`.
@@ -7,10 +7,10 @@ Please install `pipenv`.
 # Prepare Environment
 Run `pipenv install` to install the dependencies.
 
-Please create a `.env` file under the root folder and put your database connection information in it. For example:
+Please create a `.env` file under the backend folder and put your database connection information in it. For example:
 
 ```
-SQLALCHEMY_DATABASE_URL="postgresql+psycopg2://username:password@127.0.0.1:5432/postgres"
+SQLALCHEMY_DATABASE_URL="postgresql+psycopg2://username:password@127.0.0.1:5555/postgres"
 ```
 
 Run `uvicorn pyxis_app.main:app --reload` to run the application.

@@ -6,9 +6,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Load environment variables from .env
-load_dotenv()
+# First, look in current directory
+if os.path.exists(".env"):
+    load_dotenv()
+# Then look in project root (in case running from web/ directory)
+elif os.path.exists("../.env"):
+    load_dotenv("../.env")
 
-SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
+# Default if not found in environment
+DEFAULT_DB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5555/pyxis"
+SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL", DEFAULT_DB_URL)
+
+print(f"Connecting to database: {SQLALCHEMY_DATABASE_URL}")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
