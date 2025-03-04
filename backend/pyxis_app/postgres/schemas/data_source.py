@@ -3,17 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from enum import Enum
 
-
-class SourceType(str, Enum):
-    GOVERNMENT = "government"
-    PAPER = "paper"
-    COMMERCIAL = "commercial"
-    NGO = "ngo"
-
-
-class DataAccessType(str, Enum):
-    API = "api"
-    FILE_UPLOAD = "file_upload"
+from ..models.data_source import SourceType, DataAccessType
 
 
 class DataSourceMetaBase(BaseModel):
