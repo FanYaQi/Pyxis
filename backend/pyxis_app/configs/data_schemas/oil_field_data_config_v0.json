@@ -1,0 +1,170 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://pyxis.org/schemas/oil_field_data_config_v0.json",
+    "title": "Pyxis Data Mapping Configuration",
+    "description": "Schema for mapping source data fields to OPGEE attributes in the Pyxis system",
+    "type": "object",
+    "required": ["source", "mappings", "metadata"],
+    "properties": {
+      "config_metadata": {
+        "type": "object",
+        "description": "Metadata about the configuration itself",
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the configuration was created"
+          },
+          "author": {
+            "type": "string",
+            "description": "Who created the configuration"
+          },
+          "schema_id": {
+            "type": "string",
+            "description": "ID of the configuration schema"
+          }
+        }
+      },
+      "data_metadata": {
+        "type": "object",
+        "description": "Information about the data source",
+        "required": ["name", "type", "version"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable name of the data source"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the data source"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["csv", "shapefile"],
+            "description": "Type of data source file"
+          },
+          "version": {
+            "type": "string",
+            "description": "Version of the data source"
+          },
+          "attributes": {
+            "type": "array",
+            "description": "List of attributes in the data source",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of the attribute"
+                },
+                "units": {
+                  "type": "string",
+                  "description": "Units of the attribute"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description of the attribute"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["string", "number", "boolean", "date", "datetime"],
+                  "description": "Type of the attribute"
+                }
+              }
+            }
+          }
+        }
+      },
+      "spatial_configuration": {
+        "type": "object",
+        "description": "Configuration for spatial data processing",
+        "required": ["enabled"],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the source contains spatial data",
+            "default": false
+          },
+          "geometry_field": {
+            "type": "string",
+            "description": "Name of the field containing geometry data",
+            "default": "geometry"
+          },
+          "source_crs": {
+            "type": "string",
+            "description": "Coordinate reference system of the source data",
+            "default": "EPSG:4326"
+          }
+        }
+      },
+      "file_specific": {
+        "type": "object",
+        "description": "File format-specific configuration",
+        "properties": {
+          "csv": {
+            "type": "object",
+            "description": "Configuration specific to CSV files",
+            "properties": {
+              "delimiter": {
+                "type": "string",
+                "description": "Field delimiter character",
+                "default": ","
+              },
+              "encoding": {
+                "type": "string",
+                "description": "Character encoding of the file",
+                "default": "utf-8"
+              },
+              "header_row": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Row number containing column headers (0-based)",
+                "default": 0
+              }
+            }
+          },
+          "shapefile": {
+            "type": "object",
+            "description": "Configuration specific to Shapefile files",
+            "properties": {
+              "encoding": {
+                "type": "string",
+                "description": "Character encoding of the DBF file",
+                "default": "utf-8"
+              },
+              "layer_name": {
+                "type": "string",
+                "description": "Name of the layer to use if multiple layers exist",
+                "default": "0"
+              },
+              "filter_attributes": {
+                "type": "array",
+                "description": "List of attributes to keep from the shapefile",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "mappings": {
+        "type": "array",
+        "description": "Mappings from source attributes to target OPGEE attributes",
+        "items": {
+          "type": "object",
+          "required": ["source_attribute", "target_attribute"],
+          "properties": {
+            "source_attribute": {
+              "type": "string",
+              "description": "Name of the attribute in the source data"
+            },
+            "target_attribute": {
+              "type": "string",
+              "description": "Name of the corresponding OPGEE attribute"
+            }
+          }
+        }
+      }
+    }
+  }
