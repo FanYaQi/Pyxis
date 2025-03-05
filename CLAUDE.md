@@ -1,10 +1,8 @@
 # CLAUDE.md - Guide for Agent Coding in Pyxis
 
 ## Build/Run/Test Commands
-- Web server: `cd web && pipenv run uvicorn pyxis_app.main:app --reload`
-- Format code: `cd web && pipenv run black .` or `cd db && pipenv run black .`
-- Run notebook: `cd db && pipenv run jupyter notebook`
-- Database setup: `psql pyxis` → `CREATE EXTENSION postgis;` → `CREATE EXTENSION postgis_raster;`
+- Web server: `cd backend && pipenv run uvicorn pyxis_app.main:app --reload`
+- Format code: `cd backend && pipenv run black .`
 
 ## Code Style Guidelines
 - **Imports**: Standard lib → Third-party → Project modules, with blank lines between groups
@@ -12,11 +10,11 @@
 - **Naming**: snake_case for variables/functions, CamelCase for classes, ALL_CAPS for constants
 - **Types**: Type hints for function parameters and return values (Python 3.10+ style)
 - **Error Handling**: Use FastAPI HTTPException for API errors, include descriptive messages
-- **Environment**: Use pipenv for dependency management, set PYTHONPATH to include `/db`
+- **Environment**: Use pipenv for dependency management
 - **Documentation**: Docstrings with triple quotes, comments with # and space after
 
 ## Project Structure
-- `/scripts_n_notebooks`: Data processing scripts, utilities and notebooks
+- `/scripts_n_notebooks`: Data processing scripts, utilities and notebooks, do not modify code here.
 - `/backend`: FastAPI web application
 - `/docs`: Documentation and diagrams
 
