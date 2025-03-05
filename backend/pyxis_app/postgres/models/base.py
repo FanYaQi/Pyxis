@@ -1,3 +1,7 @@
-from sqlalchemy.ext.declarative import declarative_base
+"""Base class for all database models."""
+from sqlalchemy.orm import DeclarativeBase
 
-Base = declarative_base()
+
+# To be inherited by database models or classes (the ORM models).
+class Base(DeclarativeBase):
+    """Base class for all database models."""
