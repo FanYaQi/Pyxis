@@ -1,6 +1,6 @@
 # backend/pyxis_app/postgres/models/data_entry.py
 import enum
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum, DateTime, LargeBinary, JSON, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum, DateTime, LargeBinary, JSON, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -49,23 +49,29 @@ class DataEntry(Base):
     together in a single archive in raw_data.
     """
     __tablename__ = "data_entry"
+    __table_args__ = (
+        UniqueConstraint('data_entry_id', 'version', name='uq_data_entry_id_version'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     source_id = Column(String, ForeignKey("data_source_meta.source_id"), nullable=False)
+    data_entry_id = Column(String, nullable=False, index=True)
+    version = Column(String, nullable=False, index=True)
+
+    # Information about the data entry.
     alias = Column(String, nullable=False, index=True)
     file_extension = Column(Enum(FileExtension), nullable=False)
     granularity = Column(Enum(DataGranularity), nullable=False)
-    
+
     # File data and identification
     raw_data = Column(LargeBinary, nullable=True)  # Binary storage for raw file data
     raw_data_md5 = Column(String(32), nullable=True)  # MD5 hash of raw_data for validation
     file_name = Column(String, nullable=True)  # Original filename or archive name
     file_size = Column(Integer, nullable=True)  # Size in bytes
-    
+
     # Configuration and metadata
     config_file = Column(JSON, nullable=True)  # JSON storage for configuration/mapping
     config_file_md5 = Column(String(32), nullable=True)  # MD5 hash of config_file
-    version = Column(String, nullable=True)
     
     # List of files inside the archive (if applicable)
     contained_files = Column(JSON, nullable=True)  # List of filenames within the archive

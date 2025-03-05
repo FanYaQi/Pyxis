@@ -10,12 +10,13 @@ from ..models.data_entry import FileExtension, DataGranularity, ProcessingStatus
 class DataEntryBase(BaseModel):
     """Base schema with common attributes"""
     source_id: str = Field(..., description="ID of the data source this entry belongs to")
+    data_entry_id: str = Field(..., description="Unique identifier for this data entry")
+    version: str = Field(..., description="Version of the dataset")
     alias: str = Field(..., description="Human-readable identifier for this data entry")
     file_extension: FileExtension = Field(..., description="File extension type")
     granularity: DataGranularity = Field(..., description="Granularity level of the data")
     file_name: Optional[str] = Field(None, description="Original filename or archive name")
     config_file: Optional[Dict[str, Any]] = Field(None, description="Configuration/mapping information")
-    version: Optional[str] = Field(None, description="Version of the dataset")
     contained_files: Optional[List[str]] = Field(None, description="List of filenames within the archive")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
