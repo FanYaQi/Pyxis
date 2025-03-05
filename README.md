@@ -54,10 +54,6 @@ pyxis=# \dx
 - `/backend`: FastAPI web application
 - `/docs`: Documentation and diagrams
 
-## API Endpoints
-
-- `/data/init_db`: Initialize database tables
-
 ## Troubleshooting
 
 1. When installing `psycopg2`, `Error: pg_config executable not found.`:
