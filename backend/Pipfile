@@ -4,22 +4,24 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-uvicorn = {extras = ["standard"], version = "*"}
-fastapi = {extras = ["all"], version = "*"}
-sqlalchemy = "*"
-geoalchemy2 = {extras = ["shapely"], version = "*"}
-psycopg2 = "*"
-python-dotenv = "*"
+uvicorn = {extras = ["standard"], version = "~=0.34.0"}
+fastapi = {extras = ["all"], version = "~=0.115.11"}
+sqlalchemy = "~=2.0.38"
+geoalchemy2 = {extras = ["shapely"], version = "~=0.17.1"}
+psycopg2 = "~=2.9.10"
+python-dotenv = "~=1.0.1"
 pandas = "~=2.0.3"
 h3 = "~=3.7.7"
-shapely = "*"
+shapely = "~=2.0.1"
 fuzzywuzzy = "~=0.18.0"
 matplotlib = "~=3.7.2"
 seaborn = "~=0.13.2"
 scikit-learn = "~=1.4.2"
+jsonschema = "~=4.23.0"
 
 [dev-packages]
-black = "*"
+black = "~=23.3.0"
+pytest = "~=7.4.3"
 
 [requires]
 python_version = "3.11"
