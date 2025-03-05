@@ -60,18 +60,13 @@ class PyxisFieldMetaResponse(PyxisFieldMetaBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 
 # PyxisFieldData schemas
 class PyxisFieldDataBase(BaseModel):
     """Base schema for PyxisFieldData"""
 
-    pyxis_field_id: int = Field(..., description="Reference to the Pyxis field ID")
+    pyxis_field_meta_id: int = Field(..., description="Reference to the Pyxis field meta ID")
     data_entry_id: int = Field(..., description="Reference to the data entry ID")
-    data_entry_version: str = Field(..., description="Version of the data entry")
-    source_id: str = Field(..., description="Reference to the data source")
     effective_start_date: datetime = Field(
         ..., description="Start date when these attributes became effective"
     )
@@ -305,8 +300,6 @@ class PyxisFieldDataBase(BaseModel):
 class PyxisFieldDataCreate(PyxisFieldDataBase):
     """Schema for creating a new PyxisFieldData"""
 
-    pass
-
 
 class PyxisFieldDataUpdate(BaseModel):
     """Schema for updating PyxisFieldData"""
@@ -390,6 +383,3 @@ class PyxisFieldDataResponse(PyxisFieldDataBase):
     """Schema for returning PyxisFieldData"""
 
     id: int
-
-    class Config:
-        from_attributes = True

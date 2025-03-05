@@ -4,13 +4,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from ..models.data_source import SourceType, DataAccessType
+from ..postgres.models.data_source import SourceType, DataAccessType
 
 
 class DataSourceMetaBase(BaseModel):
     """Base schema with common attributes"""
 
-    source_id: str = Field(..., description="Unique identifier for the data source")
+    id: int = Field(..., description="Unique identifier for the data source")
     name: str = Field(..., description="Name of the data source (e.g., ANP, Zhan)")
     description: Optional[str] = Field(
         None, description="Detailed description of the data source"
@@ -41,13 +41,11 @@ class DataSourceMetaBase(BaseModel):
 class DataSourceMetaCreate(DataSourceMetaBase):
     """Schema for creating a new data source metadata record"""
 
-    pass
-
 
 class DataSourceMetaUpdate(BaseModel):
     """Schema for updating a data source metadata record"""
 
-    source_id: Optional[str] = None
+    id: Optional[int] = None
     name: Optional[str] = None
     description: Optional[str] = None
     urls: Optional[List[str]] = None
@@ -65,6 +63,3 @@ class DataSourceMetaResponse(DataSourceMetaBase):
     id: int
     created_at: datetime
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
