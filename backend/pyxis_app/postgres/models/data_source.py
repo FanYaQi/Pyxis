@@ -1,11 +1,21 @@
+"""
+Model for data source metadata in the Pyxis system.
+"""
+# pylint: disable=E1102,C0301
 import enum
-from sqlalchemy import Column, String, Integer, Float, DateTime, ARRAY, Enum
+from typing import List, Optional
+from datetime import datetime
+
+from sqlalchemy import String, ARRAY
 from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from .base import Base
 
 
 class SourceType(str, enum.Enum):
     """Enumeration of possible source types"""
+
     GOVERNMENT = "government"
     PAPER = "paper"
     COMMERCIAL = "commercial"
@@ -14,6 +24,7 @@ class SourceType(str, enum.Enum):
 
 class DataAccessType(str, enum.Enum):
     """Enumeration of possible data access types"""
+
     API = "api"
     FILE_UPLOAD = "file_upload"
 
@@ -23,21 +34,24 @@ class DataSourceMeta(Base):
     Model for metadata about data sources in the Pyxis system.
     Stores information about source reliability, recency, and coverage.
     """
+
     __tablename__ = "data_source_meta"
 
-    id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    urls = Column(ARRAY(String), nullable=True)
-    source_type = Column(Enum(SourceType), nullable=False)
-    data_access_type = Column(Enum(DataAccessType), nullable=False)
-    reliability_score = Column(Float, nullable=True)
-    recency_score = Column(Float, nullable=True)
-    richness_score = Column(Float, nullable=True)
-    pyxis_score = Column(Float, nullable=True)  # Overall score
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str]
+    description: Mapped[Optional[str]]
+    urls: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String))
+    source_type: Mapped[SourceType]
+    data_access_type: Mapped[DataAccessType]
+    reliability_score: Mapped[Optional[float]]
+    recency_score: Mapped[Optional[float]]
+    richness_score: Mapped[Optional[float]]
+    pyxis_score: Mapped[Optional[float]]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+    # Relationship with data entries
+    data_entries: Mapped[List["DataEntry"]] = relationship(back_populates="data_source")  # type: ignore
+
     def __repr__(self):
         return f"<DataSourceMeta(id={self.id}, name='{self.name}', pyxis_score={self.pyxis_score})>"

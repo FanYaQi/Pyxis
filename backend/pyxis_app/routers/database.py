@@ -2,11 +2,13 @@
 
 from fastapi import APIRouter
 
-from pyxis_app.postgres.database import engine, Base
+from pyxis_app.postgres.models.base import Base
+from pyxis_app.postgres.database import engine
+
 
 router = APIRouter(
-    prefix="/data",
-    tags=["data"],
+    prefix="/database",
+    tags=["database"],
     responses={404: {"description": "Not found"}},
 )
 
