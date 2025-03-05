@@ -6,8 +6,8 @@ name = "pypi"
 [packages]
 uvicorn = {extras = ["standard"], version = "~=0.34.0"}
 fastapi = {extras = ["all"], version = "~=0.115.11"}
-sqlalchemy = "~=2.0.38"
-pydantic = "~=2.10.6"
+sqlalchemy = ">=2.0.38, <3.0.0"
+pydantic = ">=2.10.6, <3.0.0"
 geoalchemy2 = {extras = ["shapely"], version = "~=0.17.1"}
 psycopg2 = "~=2.9.10"
 python-dotenv = "~=1.0.1"
@@ -19,7 +19,14 @@ matplotlib = "~=3.7.2"
 seaborn = "~=0.13.2"
 scikit-learn = "~=1.4.2"
 jsonschema = "~=4.23.0"
+# Logging/Monitoring
 logfire = "*"
+# Auth
+bcrypt = "~=4.3.0"
+authlib = "~=1.5.1"
+python-jose = {extras = ["cryptography"], version = "~=3.4.0"}
+python-multipart = "~=0.0.6"
+email-validator = "~=2.1.0"
 
 [dev-packages]
 black = "~=23.3.0"

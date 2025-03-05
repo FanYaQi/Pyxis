@@ -4,7 +4,11 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 # Import enums from models
-from pyxis_app.postgres.models.data_entry import FileExtension, DataGranularity, ProcessingStatus
+from pyxis_app.postgres.models.data_entry import (
+    FileExtension,
+    DataGranularity,
+    ProcessingStatus,
+)
 
 
 class DataEntryBase(BaseModel):
@@ -36,6 +40,7 @@ class DataEntryBase(BaseModel):
 
 class DataEntryCreate(DataEntryBase):
     """Schema for creating a new data entry"""
+
     # Used for file upload, the actual file will be handled separately
 
 

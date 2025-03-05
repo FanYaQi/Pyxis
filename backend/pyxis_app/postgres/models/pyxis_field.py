@@ -1,6 +1,7 @@
 """
 Models for Pyxis field metadata and field data.
 """
+
 # pylint: disable=E1102,C0301
 import enum
 from typing import List, Optional
@@ -100,15 +101,21 @@ class PyxisFieldMeta(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pyxis_field_code: Mapped[str] = mapped_column(unique=True, index=True)
-    field_name: Mapped[Optional[str]] = mapped_column( index=True)
-    country: Mapped[Optional[str]] = mapped_column( index=True)
-    geometry: Mapped[Optional[WKBElement]] = mapped_column(Geometry("POLYGON", srid=4326))
-    centroid_h3_index: Mapped[Optional[str]] = mapped_column( index=True)
+    field_name: Mapped[Optional[str]] = mapped_column(index=True)
+    country: Mapped[Optional[str]] = mapped_column(index=True)
+    geometry: Mapped[Optional[WKBElement]] = mapped_column(
+        Geometry("POLYGON", srid=4326)
+    )
+    centroid_h3_index: Mapped[Optional[str]] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
 
     # Relationship with pyxis_field_data
-    pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(back_populates="pyxis_field_meta")
+    pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
+        back_populates="pyxis_field_meta"
+    )
 
 
 class PyxisFieldData(Base):
@@ -127,20 +134,16 @@ class PyxisFieldData(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pyxis_field_meta_id: Mapped[int] = mapped_column(
-        ForeignKey("pyxis_field_meta.id"),
-        comment="Reference to the Pyxis field ID"
+        ForeignKey("pyxis_field_meta.id"), comment="Reference to the Pyxis field ID"
     )
     data_entry_id: Mapped[int] = mapped_column(
-        ForeignKey("data_entry.id"),
-        comment="Reference to the data entry ID"
+        ForeignKey("data_entry.id"), comment="Reference to the data entry ID"
     )
     effective_start_date: Mapped[Optional[datetime]] = mapped_column(
-        index=True,
-        comment="Start date when these attributes became effective"
+        index=True, comment="Start date when these attributes became effective"
     )
     effective_end_date: Mapped[Optional[datetime]] = mapped_column(
-        index=True,
-        comment="End date when these attributes were superseded"
+        index=True, comment="End date when these attributes were superseded"
     )
 
     # Functional attributes
@@ -175,12 +178,8 @@ class PyxisFieldData(Base):
     )
 
     # Field properties
-    age: Mapped[Optional[float]] = mapped_column(
-        comment="Age of the field in years"
-    )
-    depth: Mapped[Optional[float]] = mapped_column(
-        comment="Depth of the field in feet"
-    )
+    age: Mapped[Optional[float]] = mapped_column(comment="Age of the field in years")
+    depth: Mapped[Optional[float]] = mapped_column(comment="Depth of the field in feet")
     oil_prod: Mapped[Optional[float]] = mapped_column(
         comment="Oil production volume in barrels per day"
     )
@@ -306,8 +305,8 @@ class PyxisFieldData(Base):
     ecosystem_richness: Mapped[Optional[EcosystemRichness]] = mapped_column(
         comment="Ecosystem carbon richness category"
     )
-    field_development_intensity: Mapped[Optional[FieldDevelopmentIntensity]] = mapped_column(
-        comment="Field development intensity category"
+    field_development_intensity: Mapped[Optional[FieldDevelopmentIntensity]] = (
+        mapped_column(comment="Field development intensity category")
     )
 
     # Transportation
@@ -352,9 +351,10 @@ class PyxisFieldData(Base):
 
     # Any additional attributes
     additional_attributes: Mapped[Optional[dict]] = mapped_column(
-        JSON, 
-        comment="Additional attributes not explicitly defined in the schema"
+        JSON, comment="Additional attributes not explicitly defined in the schema"
     )
 
     # Relationship with pyxis_field_meta
-    pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(back_populates="pyxis_field_datas")
+    pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(
+        back_populates="pyxis_field_datas"
+    )

@@ -8,7 +8,7 @@ from pyxis_app.postgres.database import engine
 
 router = APIRouter(
     prefix="/database",
-    tags=["database"],
+    tags=["Database"],
     responses={404: {"description": "Not found"}},
 )
 

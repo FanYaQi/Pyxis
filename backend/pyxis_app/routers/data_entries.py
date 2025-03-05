@@ -16,8 +16,10 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
+from .auth import get_current_user
+from ..services.data_source_service import check_data_source_access
+from ..postgres.models import DataSourceMeta, User, DataEntry
 from ..postgres.models.data_entry import (
-    DataEntry,
     FileExtension,
     DataGranularity,
     ProcessingStatus,
@@ -26,13 +28,15 @@ from ..schemas.data_entry import DataEntryResponse
 from ..dependencies import get_postgres_db
 from ..utils.config_validator import validate_config
 
+
 router = APIRouter(
     prefix="/data-entries",
-    tags=["data-entries"],
+    tags=["Data Entry"],
     responses={404: {"description": "Not found"}},
 )
 
 
+# Modify the list_data_entries function
 @router.get("/", response_model=List[DataEntryResponse])
 async def list_data_entries(
     skip: int = 0,
@@ -40,6 +44,7 @@ async def list_data_entries(
     processing_status: Optional[ProcessingStatus] = None,
     source_id: Optional[str] = None,
     db: Session = Depends(get_postgres_db),
+    current_user: User = Depends(get_current_user),
 ):
     """List all data entries with optional filtering"""
     query = db.query(DataEntry)
@@ -48,7 +53,19 @@ async def list_data_entries(
         query = query.filter(DataEntry.status == processing_status)
 
     if source_id:
+        # Check if user has access to this data source
+        has_access = await check_data_source_access(source_id, current_user, db)
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this data source",
+            )
         query = query.filter(DataEntry.source_id == source_id)
+    elif not current_user.is_superuser:
+        # Non-superusers only see entries from their accessible data sources
+        query = query.join(DataSourceMeta).filter(
+            DataSourceMeta.users.any(id=current_user.id)
+        )
 
     data_entries = query.offset(skip).limit(limit).all()
     return data_entries
@@ -61,6 +78,7 @@ async def get_data_entry(entry_id: int, db: Session = Depends(get_postgres_db)):
     if data_entry is None:
         raise HTTPException(status_code=404, detail="Data entry not found")
     return data_entry
+
 
 @router.get("/{entry_id}/status")
 async def get_processing_status(entry_id: int, db: Session = Depends(get_postgres_db)):

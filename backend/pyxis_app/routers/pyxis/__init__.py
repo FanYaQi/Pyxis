@@ -1,4 +1,5 @@
 """Pyxis related apis."""
+
 from fastapi import (
     APIRouter,
 )
@@ -9,7 +10,7 @@ from .fields_data import router as fields_data_router
 
 router = APIRouter(
     prefix="/pyxis",
-    tags=["pyxis"],
+    tags=["Pyxis"],
     responses={404: {"description": "Not found"}},
 )
 

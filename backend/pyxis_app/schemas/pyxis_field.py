@@ -1,4 +1,5 @@
 """Pyxis field related schemas."""
+
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -65,7 +66,9 @@ class PyxisFieldMetaResponse(PyxisFieldMetaBase):
 class PyxisFieldDataBase(BaseModel):
     """Base schema for PyxisFieldData"""
 
-    pyxis_field_meta_id: int = Field(..., description="Reference to the Pyxis field meta ID")
+    pyxis_field_meta_id: int = Field(
+        ..., description="Reference to the Pyxis field meta ID"
+    )
     data_entry_id: int = Field(..., description="Reference to the data entry ID")
     effective_start_date: datetime = Field(
         ..., description="Start date when these attributes became effective"
