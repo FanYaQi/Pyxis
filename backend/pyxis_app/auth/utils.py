@@ -20,7 +20,7 @@ from pyxis_app.dependencies import get_postgres_db
 load_dotenv()
 
 # Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -106,6 +106,6 @@ async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Get the current active user"""
-    if current_user.disabled:
+    if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user

@@ -1,7 +1,6 @@
 """
 Data source permissions router
 """
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -11,7 +10,6 @@ from pyxis_app.postgres.models.user import User
 from pyxis_app.postgres.models.data_source import DataSourceMeta
 from pyxis_app.dependencies import get_postgres_db
 from pyxis_app.routers.auth import get_current_user
-from pyxis_app.services.data_source_service import check_data_source_access
 
 
 router = APIRouter(
@@ -28,17 +26,8 @@ class UserPermissionCreate(BaseModel):
     data_source_id: int
 
 
-class UserPermissionResponse(BaseModel):
-    """Pydantic model for a user permission response"""
-
-    user_id: int
-    user_email: str
-    data_source_id: int
-    data_source_name: str
-
-
 # Grant access to a data source
-@router.post("/{data_source_id}", response_model=UserPermissionResponse)
+@router.post("/{data_source_id}")
 async def grant_data_source_access(
     data_source_id: int,
     user_permission: UserPermissionCreate,
@@ -88,12 +77,9 @@ async def grant_data_source_access(
     data_source.users.append(user)
     db.commit()
 
-    return UserPermissionResponse(
-        user_id=user.id,
-        user_email=user.email,
-        data_source_id=data_source.id,
-        data_source_name=data_source.name,
-    )
+    return {
+        "message": f"User {user.email} granted access to data source with id {data_source.id}",
+    }
 
 
 # Revoke access to a data source
@@ -140,64 +126,3 @@ async def revoke_data_source_access(
     db.commit()
 
     return None
-
-
-# List users with access to a data source
-@router.get("/{data_source_id}", response_model=List[UserPermissionResponse])
-async def list_data_source_users(
-    data_source_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_postgres_db),
-):
-    """List all users who have access to a data source"""
-    # Verify data source exists
-    data_source = (
-        db.query(DataSourceMeta).filter(DataSourceMeta.id == data_source_id).first()
-    )
-    if not data_source:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found"
-        )
-
-    # Check if current user has access
-    has_access = await check_data_source_access(data_source_id, current_user, db)
-    if not has_access:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have access to this data source",
-        )
-
-    # Return list of users with access
-    return [
-        UserPermissionResponse(
-            user_id=user.id,
-            user_email=user.email,
-            data_source_id=data_source.id,
-            data_source_name=data_source.name,
-        )
-        for user in data_source.users
-    ]
-
-
-# List data sources a user has access to
-@router.get("/user/me", response_model=List[UserPermissionResponse])
-async def list_my_data_sources(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_postgres_db),
-):
-    """List all data sources the current user has access to"""
-    # Superusers see all data sources
-    if current_user.is_superuser:
-        data_sources = db.query(DataSourceMeta).all()
-    else:
-        data_sources = current_user.data_sources
-
-    return [
-        UserPermissionResponse(
-            user_id=current_user.id,
-            user_email=current_user.email,
-            data_source_id=ds.id,
-            data_source_name=ds.name,
-        )
-        for ds in data_sources
-    ]
