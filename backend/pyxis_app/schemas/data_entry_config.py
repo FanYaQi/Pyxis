@@ -8,110 +8,110 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, conint
+from pydantic import BaseModel, Field
 
 
 class ConfigMetadata(BaseModel):
     created_at: Optional[datetime] = Field(
-        None, description='When the configuration was created'
+        None, description="When the configuration was created"
     )
-    author: Optional[str] = Field(None, description='Who created the configuration')
-    schema_id: Optional[str] = Field(None, description='ID of the configuration schema')
+    author: Optional[str] = Field(None, description="Who created the configuration")
+    schema_id: Optional[str] = Field(None, description="ID of the configuration schema")
 
 
 class Type(Enum):
-    csv = 'csv'
-    shapefile = 'shapefile'
+    csv = "csv"
+    shapefile = "shapefile"
 
 
 class Type1(Enum):
-    string = 'string'
-    number = 'number'
-    boolean = 'boolean'
-    date = 'date'
-    datetime = 'datetime'
+    string = "string"
+    number = "number"
+    boolean = "boolean"
+    date = "date"
+    datetime = "datetime"
 
 
 class Attribute(BaseModel):
-    name: Optional[str] = Field(None, description='Name of the attribute')
-    units: Optional[str] = Field(None, description='Units of the attribute')
-    description: Optional[str] = Field(None, description='Description of the attribute')
-    type: Optional[Type1] = Field(None, description='Type of the attribute')
+    name: Optional[str] = Field(None, description="Name of the attribute")
+    units: Optional[str] = Field(None, description="Units of the attribute")
+    description: Optional[str] = Field(None, description="Description of the attribute")
+    type: Optional[Type1] = Field(None, description="Type of the attribute")
 
 
 class DataMetadata(BaseModel):
-    name: str = Field(..., description='Human-readable name of the data source')
+    name: str = Field(..., description="Human-readable name of the data source")
     description: Optional[str] = Field(
-        None, description='Detailed description of the data source'
+        None, description="Detailed description of the data source"
     )
-    type: Type = Field(..., description='Type of data source file')
-    version: str = Field(..., description='Version of the data source')
+    type: Type = Field(..., description="Type of data source file")
+    version: str = Field(..., description="Version of the data source")
     attributes: Optional[List[Attribute]] = Field(
-        None, description='List of attributes in the data source'
+        None, description="List of attributes in the data source"
     )
 
 
 class SpatialConfiguration(BaseModel):
-    enabled: bool = Field(..., description='Whether the source contains spatial data')
+    enabled: bool = Field(..., description="Whether the source contains spatial data")
     geometry_field: Optional[str] = Field(
-        'geometry', description='Name of the field containing geometry data'
+        "geometry", description="Name of the field containing geometry data"
     )
     source_crs: Optional[str] = Field(
-        'EPSG:4326', description='Coordinate reference system of the source data'
+        "EPSG:4326", description="Coordinate reference system of the source data"
     )
 
 
 class Csv(BaseModel):
-    delimiter: Optional[str] = Field(',', description='Field delimiter character')
+    delimiter: Optional[str] = Field(",", description="Field delimiter character")
     encoding: Optional[str] = Field(
-        'utf-8', description='Character encoding of the file'
+        "utf-8", description="Character encoding of the file"
     )
-    header_row: Optional[conint(ge=0)] = Field(
-        0, description='Row number containing column headers (0-based)'
+    header_row: Optional[int] = Field(
+        0, description="Row number containing column headers (0-based)", ge=0
     )
 
 
 class Shapefile(BaseModel):
     encoding: Optional[str] = Field(
-        'utf-8', description='Character encoding of the DBF file'
+        "utf-8", description="Character encoding of the DBF file"
     )
     layer_name: Optional[str] = Field(
-        '0', description='Name of the layer to use if multiple layers exist'
+        "0", description="Name of the layer to use if multiple layers exist"
     )
     filter_attributes: Optional[List[str]] = Field(
-        None, description='List of attributes to keep from the shapefile'
+        None, description="List of attributes to keep from the shapefile"
     )
 
 
 class FileSpecific(BaseModel):
-    csv: Optional[Csv] = Field(None, description='Configuration specific to CSV files')
+    csv: Optional[Csv] = Field(None, description="Configuration specific to CSV files")
     shapefile: Optional[Shapefile] = Field(
-        None, description='Configuration specific to Shapefile files'
+        None, description="Configuration specific to Shapefile files"
     )
 
 
 class Mapping(BaseModel):
     source_attribute: str = Field(
-        ..., description='Name of the attribute in the source data'
+        ..., description="Name of the attribute in the source data"
     )
     target_attribute: str = Field(
-        ..., description='Name of the corresponding OPGEE attribute'
+        ..., description="Name of the corresponding OPGEE attribute"
     )
 
 
 class DataEntryConfiguration(BaseModel):
     config_metadata: Optional[ConfigMetadata] = Field(
-        None, description='Metadata about the configuration itself'
+        None, description="Metadata about the configuration itself"
     )
     data_metadata: Optional[DataMetadata] = Field(
-        None, description='Information about the data source'
+        None, description="Information about the data source"
     )
     spatial_configuration: Optional[SpatialConfiguration] = Field(
-        None, description='Configuration for spatial data processing'
+        None, description="Configuration for spatial data processing"
     )
     file_specific: Optional[FileSpecific] = Field(
-        None, description='File format-specific configuration'
+        None, description="File format-specific configuration"
     )
     mappings: List[Mapping] = Field(
-        ..., description='Mappings from source attributes to target OPGEE attributes'
+        ..., description="Mappings from source attributes to target OPGEE attributes"
     )

@@ -8,7 +8,6 @@ from typing import List, Optional
 from datetime import datetime
 
 from sqlalchemy import (
-    String,
     ForeignKey,
     JSON,
 )
@@ -102,10 +101,12 @@ class PyxisFieldMeta(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     pyxis_field_code: Mapped[str] = mapped_column(unique=True, index=True)
     field_name: Mapped[Optional[str]] = mapped_column(index=True)
+    # TODO: Should be country_code?
     country: Mapped[Optional[str]] = mapped_column(index=True)
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
         Geometry("POLYGON", srid=4326)
     )
+    # TODO: Should we add latitude and longitude?
     centroid_h3_index: Mapped[Optional[str]] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -116,6 +117,21 @@ class PyxisFieldMeta(Base):
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"
     )
+
+    @classmethod
+    def get_pyxis_field_meta_attributes(cls) -> List[str]:
+        """
+        Get all attributes of the model except for id, created_at, updated_at
+
+        Returns:
+            List of attribute names
+        """
+        # Get all attribute names from the model
+        attrs = list(cls.__table__.columns.keys())
+
+        # Filter out excluded attributes
+        excluded = {"id", "created_at", "updated_at"}
+        return [attr for attr in attrs if attr not in excluded]
 
 
 class PyxisFieldData(Base):
@@ -144,6 +160,10 @@ class PyxisFieldData(Base):
     )
     effective_end_date: Mapped[Optional[datetime]] = mapped_column(
         index=True, comment="End date when these attributes were superseded"
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
     )
 
     # Functional attributes
@@ -358,3 +378,24 @@ class PyxisFieldData(Base):
     pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(
         back_populates="pyxis_field_datas"
     )
+
+    @classmethod
+    def get_field_attributes(cls) -> List[str]:
+        """
+        Get all attributes of the model except for id, created_at, updated_at
+
+        Returns:
+            List of attribute names
+        """
+        # Get all attribute names from the model
+        attrs = list(cls.__table__.columns.keys())
+
+        # Filter out excluded attributes
+        excluded = {
+            "id",
+            "created_at",
+            "updated_at",
+            "pyxis_field_meta_id",
+            "data_entry_id",
+        }
+        return [attr for attr in attrs if attr not in excluded]
