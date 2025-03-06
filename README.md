@@ -1,11 +1,11 @@
 # Pyxis
 
 A GIS-based data platform for oil and gas emissions monitoring. Pyxis integrates diverse data sources to consistently estimate and monitor greenhouse gas emissions in the oil and gas industry.
-
 ## Docker Setup (Recommended)
 
 1. Clone the repository.
-2. Go under the `backend` directory. Copy `.env.example` to `.env` and update the configuration
+2. Go under the `backend` directory. Please create a `.env` file under the backend folder.
+   Copy`.env.example` to `.env` and update the configuration
 3. Build and run the Docker containers under `Pyxis` root folder:
 
 ```bash
