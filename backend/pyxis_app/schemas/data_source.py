@@ -11,7 +11,6 @@ from ..postgres.models.data_source import SourceType, DataAccessType
 class DataSourceMetaBase(BaseModel):
     """Base schema with common attributes"""
 
-    id: int = Field(..., description="Unique identifier for the data source")
     name: str = Field(..., description="Name of the data source (e.g., ANP, Zhan)")
     description: Optional[str] = Field(
         None, description="Detailed description of the data source"

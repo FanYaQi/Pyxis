@@ -8,7 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
 
-from .routers import data_source_access, database, data_entries, pyxis, auth
+from .routers import (
+    database,
+    data_source_access,
+    data_sources,
+    data_entries,
+    pyxis,
+    auth,
+)
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +46,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router)
 app.include_router(database.router)
+app.include_router(data_sources.router, prefix="/api/v1")
 app.include_router(data_source_access.router, prefix="/api/v1")
 app.include_router(data_entries.router, prefix="/api/v1")
 app.include_router(pyxis.router, prefix="/api/v1")

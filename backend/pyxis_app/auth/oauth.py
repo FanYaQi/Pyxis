@@ -7,7 +7,7 @@ from fastapi import Depends
 from starlette.config import Config
 from sqlalchemy.orm import Session
 
-from pyxis_app.postgres.models.user import User
+from pyxis_app.postgres.models import User
 from pyxis_app.dependencies import get_postgres_db
 
 # Configuration

@@ -305,9 +305,9 @@ class PyxisFieldData(Base):
     ecosystem_richness: Mapped[Optional[EcosystemRichness]] = mapped_column(
         comment="Ecosystem carbon richness category"
     )
-    field_development_intensity: Mapped[Optional[FieldDevelopmentIntensity]] = (
-        mapped_column(comment="Field development intensity category")
-    )
+    field_development_intensity: Mapped[
+        Optional[FieldDevelopmentIntensity]
+    ] = mapped_column(comment="Field development intensity category")
 
     # Transportation
     frac_transport_tanker: Mapped[Optional[float]] = mapped_column(

@@ -23,12 +23,14 @@ router = APIRouter(
 # Pydantic models for request/response
 class UserPermissionCreate(BaseModel):
     """Pydantic model for creating a user permission"""
+
     user_id: int
     data_source_id: int
 
 
 class UserPermissionResponse(BaseModel):
     """Pydantic model for a user permission response"""
+
     user_id: int
     user_email: str
     data_source_id: int
@@ -95,9 +97,7 @@ async def grant_data_source_access(
 
 
 # Revoke access to a data source
-@router.delete(
-    "/{data_source_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{data_source_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_data_source_access(
     data_source_id: int,
     user_id: int,

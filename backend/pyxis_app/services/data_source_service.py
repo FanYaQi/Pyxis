@@ -3,8 +3,7 @@ Data source service
 """
 from sqlalchemy.orm import Session
 
-from pyxis_app.postgres.models.user import User
-from pyxis_app.postgres.models.data_source import DataSourceMeta
+from pyxis_app.postgres.models import User, DataSourceMeta
 
 
 # Check if user has access to a data source

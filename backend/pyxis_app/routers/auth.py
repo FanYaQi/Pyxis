@@ -4,38 +4,29 @@ from datetime import timedelta
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 from pydantic import BaseModel, EmailStr
 
 from pyxis_app.postgres.models.user import User
 from pyxis_app.dependencies import get_postgres_db
 from pyxis_app.auth.utils import (
     create_access_token,
-    SECRET_KEY,
-    ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from pyxis_app.auth.oauth import oauth, get_or_create_user
-
+from pyxis_app.auth.utils import get_current_user
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
 
 # Pydantic models for request/response data
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
 
 
 class UserCreate(BaseModel):
@@ -49,32 +40,6 @@ class UserResponse(BaseModel):
     is_active: bool
     is_superuser: bool
     oauth_provider: Optional[str] = None
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_postgres_db)
-) -> User:
-    """Get the current authenticated user from JWT token"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub", None)
-        if email is None:
-            raise credentials_exception
-        token_data = TokenData(email=email)
-    except JWTError as e:
-        raise credentials_exception from e
-
-    user = db.query(User).filter(User.email == token_data.email).first()
-    if user is None:
-        raise credentials_exception
-
-    return user
 
 
 # Local authentication routes
