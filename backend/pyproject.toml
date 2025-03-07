@@ -1,0 +1,2 @@
+[tool.logfire]
+pydantic_plugin_record = "all"

@@ -19,13 +19,22 @@ matplotlib = "~=3.7.2"
 seaborn = "~=0.13.2"
 scikit-learn = "~=1.4.2"
 jsonschema = "~=4.23.0"
-logfire = "*"
 bcrypt = "~=4.3.0"
 authlib = "~=1.5.1"
 python-jose = {extras = ["cryptography"], version = "~=3.4.0"}
 python-multipart = "~=0.0.6"
 email-validator = "~=2.1.0"
 pint = "~=0.24.4"
+# Observability
+logfire = {extras = ["system-metrics", "fastapi", "sqlalchemy", "psycopg2"], version = "*"}
+opentelemetry-instrumentation-sqlite3 = "*"
+opentelemetry-instrumentation-psycopg2 = "*"
+opentelemetry-instrumentation-jinja2 = "*"
+opentelemetry-instrumentation-urllib = "*"
+opentelemetry-instrumentation-fastapi = "*"
+opentelemetry-instrumentation-requests = "*"
+opentelemetry-instrumentation-httpx = "*"
+opentelemetry-instrumentation-sqlalchemy = "*"
 
 [dev-packages]
 black = "~=23.3.0"

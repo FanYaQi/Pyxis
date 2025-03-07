@@ -3,6 +3,7 @@
 # pylint: disable=C0301
 import os
 
+import logfire
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -23,6 +24,7 @@ load_dotenv()
 SESSION_SECRET_KEY = os.getenv(
     "SESSION_SECRET_KEY", "dev-session-secret-key-change-this-in-production"
 )
+
 
 app = FastAPI(
     title="Pyxis API",
@@ -48,6 +50,18 @@ app.include_router(database.router)
 app.include_router(data_sources.router, prefix="/api/v1")
 app.include_router(data_entries.router, prefix="/api/v1")
 app.include_router(pyxis.router, prefix="/api/v1")
+
+
+# Configure Logfire
+logfire.configure()
+logfire.instrument_system_metrics()
+logfire.instrument_pydantic()
+logfire.instrument_fastapi(app)
+
+
+@app.get("/hello")
+async def hello(name: str):
+    return {"message": f"hello {name}"}
 
 
 @app.get("/")
