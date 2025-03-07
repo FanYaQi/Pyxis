@@ -1,6 +1,7 @@
 """
 Validate the configuration file for a data entry
 """
+
 from typing import Dict, Any
 import logging
 

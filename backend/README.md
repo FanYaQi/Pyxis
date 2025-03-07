@@ -6,7 +6,7 @@ Please install `pipenv`.
 
 # Prepare Environment
 Run `pipenv install` to install the dependencies.
-Run `pipenv run` to activate the environment.
+Run `source /path/to/.venv/bin/activate` to activate the environment.
 Run `uvicorn pyxis_app.main:app --reload` to run the application.
 
 # Troubleshooting

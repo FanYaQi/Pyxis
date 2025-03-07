@@ -19,6 +19,7 @@ The unit registry is defined as a singleton in the settings module.
 >>> oil_volume_m3 = oil_volume.to("m^3")
 ```
 """
+
 import pint
 
 # Create a unit registry

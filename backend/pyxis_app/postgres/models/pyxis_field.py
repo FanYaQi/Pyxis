@@ -1,6 +1,7 @@
 """
 Models for Pyxis field metadata and field data.
 """
+
 # pylint: disable=E1102,C0301
 import enum
 from typing import List, Optional
@@ -355,9 +356,9 @@ class PyxisFieldData(Base):
     ecosystem_richness: Mapped[Optional[EcosystemRichness]] = mapped_column(
         comment="Ecosystem carbon richness category"
     )
-    field_development_intensity: Mapped[
-        Optional[FieldDevelopmentIntensity]
-    ] = mapped_column(comment="Field development intensity category")
+    field_development_intensity: Mapped[Optional[FieldDevelopmentIntensity]] = (
+        mapped_column(comment="Field development intensity category")
+    )
 
     # Transportation
     frac_transport_tanker: Mapped[Optional[float]] = mapped_column(

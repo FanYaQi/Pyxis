@@ -3,7 +3,10 @@
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict, field_serializer
+from geoalchemy2.types import WKBElement
+from geoalchemy2.shape import to_shape
+
 
 # Import the same enums from models to ensure consistency
 from pyxis_app.postgres.models.pyxis_field import (
@@ -44,6 +47,8 @@ class PyxisFieldMetaResponse(PyxisFieldMetaBase):
 class PyxisFieldDataBase(BaseModel):
     """Base schema for PyxisFieldData"""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     pyxis_field_meta_id: Optional[int] = Field(
         ..., description="Reference to the Pyxis field meta ID"
     )
@@ -62,7 +67,7 @@ class PyxisFieldDataBase(BaseModel):
     centroid_h3_index: Optional[str] = Field(
         None, description="H3 index of the field centroid"
     )
-    geometry: Optional[str] = Field(None, description="Geometry of the field")
+    geometry: Optional[WKBElement] = Field(None, description="Geometry of the field")
 
     # Functional attributes
     functional_unit: Optional[FunctionalUnit] = Field(
@@ -264,6 +269,10 @@ class PyxisFieldDataBase(BaseModel):
         None, description="Additional attributes not explicitly defined"
     )
 
+    @field_serializer("geometry")
+    def serialize_geometry(self, geometry: WKBElement):
+        return to_shape(geometry).wkt
+
     # Validators for fraction fields to ensure they're between 0 and 1
     @field_validator(
         "fraction_elec_onsite",
@@ -282,7 +291,7 @@ class PyxisFieldDataBase(BaseModel):
     @classmethod
     def validate_fractions(cls, v):
         """Validate fractions to ensure they're between 0 and 1."""
-        if v is not None and (v < 0 or v > 1):
+        if v is not None and (v < 0 or v > 100):
             raise ValueError("Fraction value must be between 0 and 1")
         return v
 

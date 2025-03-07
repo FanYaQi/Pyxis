@@ -1,6 +1,7 @@
 """
 This module contains the validator for the OPGEE schema.
 """
+
 import logging
 from typing import Dict, List, Any
 
