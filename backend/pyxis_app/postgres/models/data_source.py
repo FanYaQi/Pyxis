@@ -22,6 +22,8 @@ class SourceType(str, enum.Enum):
     PAPER = "paper"
     COMMERCIAL = "commercial"
     NGO = "ngo"
+    PERSONAL = "personal"
+    OTHER = "other"
 
 
 class DataAccessType(str, enum.Enum):

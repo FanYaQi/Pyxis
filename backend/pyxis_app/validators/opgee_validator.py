@@ -5,17 +5,18 @@ import logging
 from typing import Dict, List, Any
 
 from pyxis_app.postgres.models.pyxis_field import PyxisFieldMeta, PyxisFieldData
+from pyxis_app.schemas.data_entry_config import Mapping
 
 
 logger = logging.getLogger(__name__)
 
 
-def validate_opgee_mappings(mappings: List[Dict[str, str]]) -> Dict[str, Any]:
+def validate_opgee_mappings(mappings: List[Mapping]) -> Dict[str, Any]:
     """
     Validate that target attributes in mappings exist in OPGEE schema.
 
     Args:
-        mappings: List of mapping dictionaries with source_attribute and target_attribute
+        mappings: List of mapping objects with source_attribute and target_attribute
 
     Returns:
         Dict with validation result:
@@ -32,7 +33,7 @@ def validate_opgee_mappings(mappings: List[Dict[str, str]]) -> Dict[str, Any]:
 
         # Check each mapping
         for mapping in mappings:
-            target_attr = mapping.get("target_attribute")
+            target_attr = mapping.target_attribute
             if target_attr and target_attr not in valid_attrs:
                 errors.append(
                     f"Target attribute '{target_attr}' is not a valid OPGEE attribute"

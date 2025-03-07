@@ -123,6 +123,9 @@ class DataEntry(Base):
     # Relationship with data source
     data_source: Mapped["DataSourceMeta"] = relationship(back_populates="data_entries")  # type: ignore
 
+    # Relationship with field meta
+    pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(back_populates="data_entry")  # type: ignore
+
     def __repr__(self):
         return (
             f"<DataEntry(id={self.id}, alias='{self.alias}', file_extension="

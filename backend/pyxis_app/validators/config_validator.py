@@ -12,7 +12,7 @@ from pyxis_app.schemas.data_entry_config import DataEntryConfiguration
 logger = logging.getLogger(__name__)
 
 
-def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def validate_config(config: Dict[str, Any]) -> DataEntryConfiguration:
     """
     Validate the configuration using Pydantic model
 
@@ -20,20 +20,16 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
         config: Configuration dictionary to validate
 
     Returns:
-        Dictionary with validation result:
-        {
-            "valid": True/False,
-            "errors": [list of error messages]
-        }
+        Pydantic model of the configuration
     """
     errors = []
 
     try:
         # Use the Pydantic model for validation
-        DataEntryConfiguration(**config)
+        config_model = DataEntryConfiguration(**config)
 
         # If we get here, validation passed
-        return {"valid": True, "errors": []}
+        return config_model
 
     except ValidationError as e:
         # Convert Pydantic validation errors to a list of error messages
@@ -41,8 +37,6 @@ def validate_config(config: Dict[str, Any]) -> Dict[str, Any]:
             loc = " -> ".join(str(x) for x in error["loc"])
             msg = error["msg"]
             errors.append(f"{loc}: {msg}")
-
+        raise ValidationError(f"Invalid config file: {errors}") from e
     except Exception as e:
-        errors.append(f"Unexpected error validating config: {str(e)}")
-
-    return {"valid": False, "errors": errors}
+        raise ValueError(f"Unexpected error validating config: {str(e)}") from e

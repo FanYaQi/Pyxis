@@ -5,10 +5,11 @@ from typing import Dict, Any
 import pandas as pd
 
 from pyxis_app.postgres.models.data_entry import FileExtension
+from pyxis_app.schemas.data_entry_config import DataEntryConfiguration
 
 
 async def validate_data(
-    data_content: bytes, file_extension: FileExtension, config: Dict[str, Any]
+    data_content: bytes, file_extension: FileExtension, config: DataEntryConfiguration
 ) -> Dict[str, Any]:
     """
     Validate data content against config specifications.
@@ -35,7 +36,9 @@ async def validate_data(
         }
 
 
-def validate_csv_data(data_content: bytes, config: Dict[str, Any]) -> Dict[str, Any]:
+def validate_csv_data(
+    data_content: bytes, config: DataEntryConfiguration
+) -> Dict[str, Any]:
     """
     Validate CSV data against config.
 
@@ -51,10 +54,13 @@ def validate_csv_data(data_content: bytes, config: Dict[str, Any]) -> Dict[str, 
 
     try:
         # Get CSV specific config
-        csv_config = config.get("file_specific", {}).get("csv", {})
-        delimiter = csv_config.get("delimiter", ",")
-        encoding = csv_config.get("encoding", "utf-8")
-        header_row = csv_config.get("header_row", 0)
+        if not (config.file_specific and config.file_specific.csv):
+            raise ValueError("CSV specific config is required")
+
+        csv_config = config.file_specific.csv
+        delimiter = csv_config.delimiter
+        encoding = csv_config.encoding
+        header_row = csv_config.header_row
 
         # Read CSV into pandas DataFrame
         df = pd.read_csv(
@@ -65,8 +71,8 @@ def validate_csv_data(data_content: bytes, config: Dict[str, Any]) -> Dict[str, 
         )
 
         # Get mappings
-        mappings = config.get("mappings", [])
-        source_attrs = [m.get("source_attribute") for m in mappings]
+        mappings = config.mappings
+        source_attrs = [m.source_attribute for m in mappings]
 
         # Check if all mapped attributes exist in the data
         missing_attrs = [attr for attr in source_attrs if attr not in df.columns]

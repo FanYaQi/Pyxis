@@ -198,10 +198,10 @@ class PyxisFieldData(Base):
     )
 
     # Field properties
-    age: Mapped[Optional[float]] = mapped_column(comment="Age of the field in years")
-    depth: Mapped[Optional[float]] = mapped_column(comment="Depth of the field in feet")
+    age: Mapped[Optional[float]] = mapped_column(comment="Age of the field in years", info={"units": "years"})
+    depth: Mapped[Optional[float]] = mapped_column(comment="Depth of the field in feet", info={"units": "ft"})
     oil_prod: Mapped[Optional[float]] = mapped_column(
-        comment="Oil production volume in barrels per day"
+        comment="Oil production volume in barrels per day", info={"units": "bbl/day"}
     )
     num_prod_wells: Mapped[Optional[int]] = mapped_column(
         comment="Number of producing wells"
@@ -210,22 +210,23 @@ class PyxisFieldData(Base):
         comment="Number of water injecting wells"
     )
     well_diam: Mapped[Optional[float]] = mapped_column(
-        comment="Production tubing diameter in inches"
+        comment="Production tubing diameter in inches", info={"units": "inch"}
     )
     prod_index: Mapped[Optional[float]] = mapped_column(
-        comment="Productivity index in bbl_oil/(psia*day)"
+        comment="Productivity index in bbl_oil/(psi*day)", info={"units": "bbl_oil/(psi*day)"}
     )
     res_press: Mapped[Optional[float]] = mapped_column(
-        comment="Reservoir pressure in psia"
+        comment="Reservoir pressure in psi", info={"units": "psi"}
     )
     res_temp: Mapped[Optional[float]] = mapped_column(
-        comment="Reservoir temperature in degrees Fahrenheit"
+        comment="Reservoir temperature in degrees Fahrenheit", info={"units": "degF"}
     )
     offshore: Mapped[Optional[bool]] = mapped_column(
         comment="Whether the field is offshore"
     )
 
     # Oil and gas properties
+    # TODO: Confirm units, there is no units for API gravity.
     api: Mapped[Optional[float]] = mapped_column(
         comment="API gravity of oil at standard pressure and temperature"
     )
@@ -253,19 +254,19 @@ class PyxisFieldData(Base):
 
     # Ratios
     gor: Mapped[Optional[float]] = mapped_column(
-        comment="Gas-to-oil ratio in scf/bbl_oil"
+        comment="Gas-to-oil ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
     )
     wor: Mapped[Optional[float]] = mapped_column(
-        comment="Water-to-oil ratio in bbl_water/bbl_oil"
+        comment="Water-to-oil ratio in bbl_water/bbl_oil", info={"units": "bbl_water/bbl_oil"}
     )
     wir: Mapped[Optional[float]] = mapped_column(
-        comment="Water injection ratio in bbl_water/bbl_oil"
+        comment="Water injection ratio in bbl_water/bbl_oil", info={"units": "bbl_water/bbl_oil"}
     )
     glir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas lifting injection ratio in scf/bbl_liquid"
+        comment="Gas lifting injection ratio in scf/bbl_liquid", info={"units": "scf/bbl_liquid"}
     )
     gfir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas flooding injection ratio in scf/bbl_oil"
+        comment="Gas flooding injection ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
     )
     flood_gas_type: Mapped[Optional[FloodGasType]] = mapped_column(
         comment="Type of gas used for flooding"
@@ -280,7 +281,7 @@ class PyxisFieldData(Base):
         comment="Percentage of sequestration credit assigned to the oilfield"
     )
     sor: Mapped[Optional[float]] = mapped_column(
-        comment="Steam-to-oil ratio in bbl_steam/bbl_oil"
+        comment="Steam-to-oil ratio in bbl_steam/bbl_oil", info={"units": "bbl_steam/bbl_oil"}
     )
 
     # Fractions and processing
@@ -312,7 +313,7 @@ class PyxisFieldData(Base):
         comment="Associated gas processing path"
     )
     for_value: Mapped[Optional[float]] = mapped_column(
-        comment="Flaring-to-oil ratio in scf/bbl_oil"
+        comment="Flaring-to-oil ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
     )
     frac_venting: Mapped[Optional[float]] = mapped_column(
         comment="Purposeful venting fraction (post-flare gas fraction vented)"
@@ -346,27 +347,26 @@ class PyxisFieldData(Base):
         comment="Fraction of product transported by truck"
     )
     transport_dist_tanker: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by ocean tanker in miles"
+        comment="Transportation distance by ocean tanker in miles", info={"units": "miles"}
     )
     transport_dist_barge: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by barge in miles"
+        comment="Transportation distance by barge in miles", info={"units": "miles"}
     )
     transport_dist_pipeline: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by pipeline in miles"
+        comment="Transportation distance by pipeline in miles", info={"units": "miles"}
     )
     transport_dist_rail: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by rail in miles"
+        comment="Transportation distance by rail in miles", info={"units": "miles"}
     )
     transport_dist_truck: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by truck in miles"
+        comment="Transportation distance by truck in miles", info={"units": "miles"}
     )
     ocean_tanker_size: Mapped[Optional[float]] = mapped_column(
-        comment="Ocean tanker size in tonnes"
+        comment="Ocean tanker size in tonnes", info={"units": "tonne"}
     )
-
     # Additional data, did not find it in opgee_attributes.xml
     small_sources_emissions: Mapped[Optional[float]] = mapped_column(
-        comment="Small sources emissions"
+        comment="Small sources emissions", info={"units": "g/MJ"}
     )
 
     # Any additional attributes
@@ -376,6 +376,9 @@ class PyxisFieldData(Base):
 
     # Relationship with pyxis_field_meta
     pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(
+        back_populates="pyxis_field_datas"
+    )
+    data_entry: Mapped["DataEntry"] = relationship(  # type: ignore
         back_populates="pyxis_field_datas"
     )
 
