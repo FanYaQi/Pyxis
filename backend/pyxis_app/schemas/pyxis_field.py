@@ -67,7 +67,7 @@ class PyxisFieldDataBase(BaseModel):
     centroid_h3_index: Optional[str] = Field(
         None, description="H3 index of the field centroid"
     )
-    geometry: Optional[WKBElement] = Field(None, description="Geometry of the field")
+    geometry: Optional[WKBElement] = Field(None, description="Geometry of the field", exclude=True)
 
     # Functional attributes
     functional_unit: Optional[FunctionalUnit] = Field(

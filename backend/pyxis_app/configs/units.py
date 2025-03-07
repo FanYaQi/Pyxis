@@ -33,7 +33,7 @@ ureg.define(
     "barrel_oil = 42 * gallon = bbl_oil = bbl_water = bbl_steam = bbl_liquid = bbl"
 )  # Standard oil barrel
 ureg.define("mmbbl = 1e6 * bbl")  # Million barrels
-ureg.define("mbbl = 1e3 * bbl")  # Thousand barrels
+ureg.define("mbbl = kbbl = 1e3 * bbl")  # Thousand barrels
 
 # Gas volume units
 ureg.define("standard_cubic_foot = ft**3 = scf")  # Standard cubic foot
