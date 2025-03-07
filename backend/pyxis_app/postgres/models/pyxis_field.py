@@ -1,13 +1,18 @@
 """
 Models for Pyxis field metadata and field data.
 """
-
 # pylint: disable=E1102,C0301
 import enum
 from typing import List, Optional
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
+    Integer,
+    Float,
+    String,
+    Date,
+    DateTime,
     ForeignKey,
     JSON,
 )
@@ -16,7 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from geoalchemy2 import Geometry
 from geoalchemy2.types import WKBElement
 
-
+from pyxis_app.schemas.data_entry_config import Attribute, AttributeType
 from .base import Base
 
 
@@ -98,11 +103,14 @@ class PyxisFieldMeta(Base):
 
     __tablename__ = "pyxis_field_meta"
 
+    # TODO: Consider store all this information in the pyxis_field_data table
     id: Mapped[int] = mapped_column(primary_key=True)
     pyxis_field_code: Mapped[str] = mapped_column(unique=True, index=True)
-    field_name: Mapped[Optional[str]] = mapped_column(index=True)
+    # TODO: Maybe should be a list of matched names?
+    name: Mapped[Optional[str]] = mapped_column(index=True)
     # TODO: Should be country_code?
     country: Mapped[Optional[str]] = mapped_column(index=True)
+    # TODO: Do we need to store the geometry?
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
         Geometry("POLYGON", srid=4326)
     )
@@ -149,7 +157,7 @@ class PyxisFieldData(Base):
     # )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    pyxis_field_meta_id: Mapped[int] = mapped_column(
+    pyxis_field_meta_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("pyxis_field_meta.id"), comment="Reference to the Pyxis field ID"
     )
     data_entry_id: Mapped[int] = mapped_column(
@@ -166,6 +174,17 @@ class PyxisFieldData(Base):
         server_default=func.now(), onupdate=func.now()
     )
 
+    name: Mapped[Optional[str]] = mapped_column(index=True)
+    country: Mapped[Optional[str]] = mapped_column(index=True)
+    latitude: Mapped[Optional[float]] = mapped_column(comment="Latitude of the field")
+    longitude: Mapped[Optional[float]] = mapped_column(comment="Longitude of the field")
+    # TODO: is the data type correct?
+    centroid_h3_index: Mapped[Optional[str]] = mapped_column(
+        comment="H3 index of the field centroid"
+    )
+    geometry: Mapped[Optional[WKBElement]] = mapped_column(
+        Geometry("POLYGON", srid=4326), comment="Geometry of the field"
+    )
     # Functional attributes
     functional_unit: Mapped[Optional[FunctionalUnit]] = mapped_column(
         comment="Whether the field produces primarily oil or gas"
@@ -198,8 +217,12 @@ class PyxisFieldData(Base):
     )
 
     # Field properties
-    age: Mapped[Optional[float]] = mapped_column(comment="Age of the field in years", info={"units": "years"})
-    depth: Mapped[Optional[float]] = mapped_column(comment="Depth of the field in feet", info={"units": "ft"})
+    age: Mapped[Optional[float]] = mapped_column(
+        comment="Age of the field in years", info={"units": "years"}
+    )
+    depth: Mapped[Optional[float]] = mapped_column(
+        comment="Depth of the field in feet", info={"units": "ft"}
+    )
     oil_prod: Mapped[Optional[float]] = mapped_column(
         comment="Oil production volume in barrels per day", info={"units": "bbl/day"}
     )
@@ -213,7 +236,8 @@ class PyxisFieldData(Base):
         comment="Production tubing diameter in inches", info={"units": "inch"}
     )
     prod_index: Mapped[Optional[float]] = mapped_column(
-        comment="Productivity index in bbl_oil/(psi*day)", info={"units": "bbl_oil/(psi*day)"}
+        comment="Productivity index in bbl_oil/(psi*day)",
+        info={"units": "bbl_oil/(psi*day)"},
     )
     res_press: Mapped[Optional[float]] = mapped_column(
         comment="Reservoir pressure in psi", info={"units": "psi"}
@@ -257,16 +281,20 @@ class PyxisFieldData(Base):
         comment="Gas-to-oil ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
     )
     wor: Mapped[Optional[float]] = mapped_column(
-        comment="Water-to-oil ratio in bbl_water/bbl_oil", info={"units": "bbl_water/bbl_oil"}
+        comment="Water-to-oil ratio in bbl_water/bbl_oil",
+        info={"units": "bbl_water/bbl_oil"},
     )
     wir: Mapped[Optional[float]] = mapped_column(
-        comment="Water injection ratio in bbl_water/bbl_oil", info={"units": "bbl_water/bbl_oil"}
+        comment="Water injection ratio in bbl_water/bbl_oil",
+        info={"units": "bbl_water/bbl_oil"},
     )
     glir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas lifting injection ratio in scf/bbl_liquid", info={"units": "scf/bbl_liquid"}
+        comment="Gas lifting injection ratio in scf/bbl_liquid",
+        info={"units": "scf/bbl_liquid"},
     )
     gfir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas flooding injection ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
+        comment="Gas flooding injection ratio in scf/bbl_oil",
+        info={"units": "scf/bbl_oil"},
     )
     flood_gas_type: Mapped[Optional[FloodGasType]] = mapped_column(
         comment="Type of gas used for flooding"
@@ -281,7 +309,8 @@ class PyxisFieldData(Base):
         comment="Percentage of sequestration credit assigned to the oilfield"
     )
     sor: Mapped[Optional[float]] = mapped_column(
-        comment="Steam-to-oil ratio in bbl_steam/bbl_oil", info={"units": "bbl_steam/bbl_oil"}
+        comment="Steam-to-oil ratio in bbl_steam/bbl_oil",
+        info={"units": "bbl_steam/bbl_oil"},
     )
 
     # Fractions and processing
@@ -347,7 +376,8 @@ class PyxisFieldData(Base):
         comment="Fraction of product transported by truck"
     )
     transport_dist_tanker: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by ocean tanker in miles", info={"units": "miles"}
+        comment="Transportation distance by ocean tanker in miles",
+        info={"units": "miles"},
     )
     transport_dist_barge: Mapped[Optional[float]] = mapped_column(
         comment="Transportation distance by barge in miles", info={"units": "miles"}
@@ -402,3 +432,60 @@ class PyxisFieldData(Base):
             "data_entry_id",
         }
         return [attr for attr in attrs if attr not in excluded]
+
+    @classmethod
+    def get_attribute_info_by_name(cls, name: str) -> Attribute:
+        """
+        Get the attribute info by name
+
+        Args:
+            name: The name of the attribute to get info for
+
+        Returns:
+            Attribute object with the attribute's metadata
+
+        Raises:
+            ValueError: If the attribute doesn't exist in the model
+        """
+        if name not in cls.__table__.columns:
+            raise ValueError(f"Attribute {name} not found in {cls.__tablename__}")
+
+        column = cls.__table__.columns[name]
+
+        # Get the units from the info dictionary if it exists
+        units = (
+            column.info.get("units")
+            if hasattr(column, "info") and column.info
+            else None
+        )
+
+        # Get the description from the comment attribute
+        description = getattr(column, "comment", None)
+
+        # Map SQLAlchemy types to AttributeType
+        type_map = {
+            Boolean: AttributeType.boolean,
+            Integer: AttributeType.integer,
+            Float: AttributeType.number,
+            String: AttributeType.string,
+            Date: AttributeType.date,
+            DateTime: AttributeType.datetime,
+            Geometry: AttributeType.geometry,
+        }
+
+        # Default to string
+        attr_type = AttributeType.string
+
+        # Find the matching type in the map
+        for sql_type, attribute_type in type_map.items():
+            if isinstance(column.type, sql_type):
+                attr_type = attribute_type
+                break
+
+        # Handle enum types
+        if hasattr(column.type, "enum_class") and column.type.enum_class is not None:  # type: ignore
+            attr_type = AttributeType.string
+
+        return Attribute(
+            name=name, units=units, description=description, type=attr_type
+        )

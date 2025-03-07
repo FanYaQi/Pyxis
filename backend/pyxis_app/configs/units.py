@@ -28,7 +28,9 @@ ureg = pint.UnitRegistry()
 # Note: Many common units are already defined in Pint
 
 # Oil volume units
-ureg.define("barrel_oil = 42 * gallon = bbl_oil = bbl_water = bbl_steam = bbl_liquid = bbl")  # Standard oil barrel
+ureg.define(
+    "barrel_oil = 42 * gallon = bbl_oil = bbl_water = bbl_steam = bbl_liquid = bbl"
+)  # Standard oil barrel
 ureg.define("mmbbl = 1e6 * bbl")  # Million barrels
 ureg.define("mbbl = 1e3 * bbl")  # Thousand barrels
 

@@ -106,7 +106,7 @@ async def login_for_access_token(
 async def login_google(request: Request):
     """Initiate Google OAuth login flow"""
     redirect_uri = request.url_for("auth_google_callback")
-    return await oauth.google.authorize_redirect(request, redirect_uri) # type: ignore
+    return await oauth.google.authorize_redirect(request, redirect_uri)  # type: ignore
 
 
 @router.get("/login/google/callback")
@@ -114,7 +114,7 @@ async def auth_google_callback(
     request: Request, db: Session = Depends(get_postgres_db)
 ):
     """Handle Google OAuth callback and create/get user"""
-    token = await oauth.google.authorize_access_token(request) # type: ignore
+    token = await oauth.google.authorize_access_token(request)  # type: ignore
     user_info = token.get("userinfo")
 
     if not user_info or not user_info.get("email"):

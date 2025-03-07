@@ -1,9 +1,8 @@
 # backend/pyxis_app/postgres/schemas/data_entry.py
 from typing import Optional, Any, Dict, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
-# Import enums from models
 from pyxis_app.postgres.models.data_entry import (
     FileExtension,
     DataGranularity,
@@ -11,69 +10,34 @@ from pyxis_app.postgres.models.data_entry import (
 )
 
 
-class DataEntryBase(BaseModel):
-    """Base schema with common attributes"""
+class DataEntryInfo(BaseModel):
+    """Schema for data entry information"""
 
-    source_id: str = Field(
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_id: int = Field(
         ..., description="ID of the data source this entry belongs to"
     )
     record_id: str = Field(..., description="Record ID for this data entry")
     version: str = Field(..., description="Version of the dataset")
     alias: str = Field(..., description="Human-readable identifier for this data entry")
-    file_extension: FileExtension = Field(..., description="File extension type")
     granularity: DataGranularity = Field(
         ..., description="Granularity level of the data"
     )
     file_name: Optional[str] = Field(
         None, description="Original filename or archive name"
     )
-    config_file: Optional[Dict[str, Any]] = Field(
-        None, description="Configuration/mapping information"
-    )
+    file_extension: FileExtension = Field(..., description="File extension type")
+    file_size: Optional[int] = Field(None, description="Size of the file in bytes")
     contained_files: Optional[List[str]] = Field(
         None, description="List of filenames within the archive"
     )
-    entry_metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata for the entry"
-    )
-
-
-class DataEntryCreate(DataEntryBase):
-    """Schema for creating a new data entry"""
-
-    # Used for file upload, the actual file will be handled separately
-
-
-class DataEntryUpdate(BaseModel):
-    """Schema for updating a data entry"""
-
-    alias: Optional[str] = None
-    file_extension: Optional[FileExtension] = None
-    granularity: Optional[DataGranularity] = None
-    config_file: Optional[Dict[str, Any]] = None
-    version: Optional[str] = None
-    status: Optional[ProcessingStatus] = None
-    error_message: Optional[str] = None
-    entry_metadata: Optional[Dict[str, Any]] = None
-    contained_files: Optional[List[str]] = None
-
-
-class DataEntryResponse(DataEntryBase):
-    """Schema for a complete data entry record with database fields"""
-
-    id: int
-    file_size: Optional[int] = None
     raw_data_md5: Optional[str] = None
     config_file_md5: Optional[str] = None
-    upload_date: datetime
     status: ProcessingStatus
-    error_message: Optional[str] = None
+    additional_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Additional metadata for the entry"
+    )
     created_at: datetime
-    updated_at: Optional[datetime] = None
-
-
-class DataEntryFile(BaseModel):
-    """Schema for handling file uploads"""
-
-    file_contents: bytes
-    file_name: str
+    updated_at: datetime

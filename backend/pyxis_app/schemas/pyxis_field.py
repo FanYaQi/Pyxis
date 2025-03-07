@@ -25,7 +25,7 @@ class PyxisFieldMetaBase(BaseModel):
     pyxis_field_id: str = Field(
         ..., description="Unique identifier for the Pyxis field"
     )
-    field_name: Optional[str] = Field(None, description="Name of the field")
+    name: Optional[str] = Field(None, description="Name of the field")
     country: Optional[str] = Field(
         None, description="Country where the field is located"
     )
@@ -47,7 +47,7 @@ class PyxisFieldMetaCreate(PyxisFieldMetaBase):
 class PyxisFieldMetaUpdate(BaseModel):
     """Schema for updating a PyxisFieldMeta"""
 
-    field_name: Optional[str] = None
+    name: Optional[str] = None
     country: Optional[str] = None
     centroid_h3_index: Optional[str] = None
     geometry_wkt: Optional[str] = None
@@ -76,6 +76,15 @@ class PyxisFieldDataBase(BaseModel):
     effective_end_date: Optional[datetime] = Field(
         None, description="End date when these attributes were superseded"
     )
+
+    name: Optional[str] = Field(None, description="Name of the field")
+    country: Optional[str] = Field(None, description="Country of the field")
+    latitude: Optional[float] = Field(None, description="Latitude of the field")
+    longitude: Optional[float] = Field(None, description="Longitude of the field")
+    centroid_h3_index: Optional[str] = Field(
+        None, description="H3 index of the field centroid"
+    )
+    geometry: Optional[str] = Field(None, description="Geometry of the field")
 
     # Functional attributes
     functional_unit: Optional[FunctionalUnit] = Field(
@@ -298,88 +307,6 @@ class PyxisFieldDataBase(BaseModel):
         if v is not None and (v < 0 or v > 1):
             raise ValueError("Fraction value must be between 0 and 1")
         return v
-
-
-class PyxisFieldDataCreate(PyxisFieldDataBase):
-    """Schema for creating a new PyxisFieldData"""
-
-
-class PyxisFieldDataUpdate(BaseModel):
-    """Schema for updating PyxisFieldData"""
-
-    # All fields are optional for update
-    data_entry_id: Optional[int] = None
-    data_entry_version: Optional[str] = None
-    source_id: Optional[str] = None
-    effective_start_date: Optional[datetime] = None
-    effective_end_date: Optional[datetime] = None
-    functional_unit: Optional[FunctionalUnit] = None
-    downhole_pump: Optional[bool] = None
-    water_reinjection: Optional[bool] = None
-    natural_gas_reinjection: Optional[bool] = None
-    water_flooding: Optional[bool] = None
-    gas_lifting: Optional[bool] = None
-    gas_flooding: Optional[bool] = None
-    steam_flooding: Optional[bool] = None
-    oil_sands_mine_type: Optional[OilSandsMineType] = None
-    age: Optional[float] = None
-    depth: Optional[float] = None
-    oil_prod: Optional[float] = None
-    num_prod_wells: Optional[int] = None
-    num_water_inj_wells: Optional[int] = None
-    well_diam: Optional[float] = None
-    prod_index: Optional[float] = None
-    res_press: Optional[float] = None
-    res_temp: Optional[float] = None
-    offshore: Optional[bool] = None
-    api: Optional[float] = None
-    gas_comp_n2: Optional[float] = None
-    gas_comp_co2: Optional[float] = None
-    gas_comp_c1: Optional[float] = None
-    gas_comp_c2: Optional[float] = None
-    gas_comp_c3: Optional[float] = None
-    gas_comp_c4: Optional[float] = None
-    gas_comp_h2s: Optional[float] = None
-    gor: Optional[float] = None
-    wor: Optional[float] = None
-    wir: Optional[float] = None
-    glir: Optional[float] = None
-    gfir: Optional[float] = None
-    flood_gas_type: Optional[FloodGasType] = None
-    frac_co2_breakthrough: Optional[float] = None
-    co2_source: Optional[CO2SourceType] = None
-    perc_sequestration_credit: Optional[float] = None
-    sor: Optional[float] = None
-    fraction_elec_onsite: Optional[float] = None
-    fraction_remaining_gas_inj: Optional[float] = None
-    fraction_water_reinjected: Optional[float] = None
-    fraction_steam_cogen: Optional[float] = None
-    fraction_steam_solar: Optional[float] = None
-    heater_treater: Optional[bool] = None
-    stabilizer_column: Optional[bool] = None
-    upgrader_type: Optional[UpgraderType] = None
-    gas_processing_path: Optional[GasProcessingPath] = None
-    for_value: Optional[float] = None
-    frac_venting: Optional[float] = None
-    fraction_diluent: Optional[float] = None
-    ecosystem_richness: Optional[EcosystemRichness] = None
-    field_development_intensity: Optional[FieldDevelopmentIntensity] = None
-    frac_transport_tanker: Optional[float] = None
-    frac_transport_barge: Optional[float] = None
-    frac_transport_pipeline: Optional[float] = None
-    frac_transport_rail: Optional[float] = None
-    frac_transport_truck: Optional[float] = None
-    transport_dist_tanker: Optional[float] = None
-    transport_dist_barge: Optional[float] = None
-    transport_dist_pipeline: Optional[float] = None
-    transport_dist_rail: Optional[float] = None
-    transport_dist_truck: Optional[float] = None
-    ocean_tanker_size: Optional[float] = None
-    small_sources_emissions: Optional[float] = None
-    additional_attributes: Optional[Dict[str, Any]] = None
-
-    # Reuse the validators from the base class
-    _validate_fractions = PyxisFieldDataBase.validate_fractions
 
 
 class PyxisFieldDataResponse(PyxisFieldDataBase):

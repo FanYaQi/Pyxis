@@ -1,21 +1,36 @@
 # backend/pyxis_app/routers/data_entries.py
 import json
 import uuid
-from typing import Optional, Dict, Any, Annotated
+from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    UploadFile,
+    File,
+    BackgroundTasks,
+)
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field, ConfigDict, Json
+from pydantic import BaseModel, Field, ConfigDict
+
 
 from pyxis_app.dependencies import get_postgres_db
 from pyxis_app.postgres.models import User, DataSourceMeta
 from pyxis_app.postgres.models.data_entry import (
     FileExtension,
     DataGranularity,
+    DataEntry,
 )
-from pyxis_app.schemas.data_entry import DataEntryResponse
-from pyxis_app.services.data_entry_service import process_data_entry
+from pyxis_app.schemas.data_entry import DataEntryInfo
+from pyxis_app.services.data_entry_service import validate_data_entry
 from pyxis_app.auth.utils import get_current_user
+from pyxis_app.services.data_entry_service import (
+    trigger_data_processing,
+    get_data_entry_status,
+)
+from pyxis_app.services.data_source_service import check_data_source_access
 
 
 router = APIRouter(
@@ -40,7 +55,16 @@ class DataEntryUploadForm(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-@router.post("/", response_model=DataEntryResponse, status_code=status.HTTP_201_CREATED)
+class DataEntryUploadResponse(BaseModel):
+    """Response for data entry upload"""
+
+    data_entry: DataEntryInfo
+    message: str = "Data entry uploaded successfully"
+
+
+@router.post(
+    "/", response_model=DataEntryUploadResponse, status_code=status.HTTP_201_CREATED
+)
 async def upload_data_entry(
     form_data: DataEntryUploadForm = Depends(),
     data_file: UploadFile = File(...),
@@ -91,21 +115,27 @@ async def upload_data_entry(
     record_id = str(uuid.uuid4())
     version = "1.0.0"  # Initial version
 
+    # TODO: Check if the data entry already exists by md5 hash of the data file
+
     # Determine file extension from filename
     file_extension = None
     if data_file.filename:
         ext = data_file.filename.split(".")[-1].lower()
         try:
+            # TODO: Shapefile logic is different
             file_extension = FileExtension(ext)
         except ValueError:
             file_extension = FileExtension.OTHER
 
     if not file_extension:
-        file_extension = FileExtension.OTHER
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file extension",
+        )
 
-    # Process the data entry
+    # Validate the data entry
     try:
-        data_entry = await process_data_entry(
+        data_entry = await validate_data_entry(
             db=db,
             source_id=form_data.source_id,
             record_id=record_id,
@@ -120,7 +150,9 @@ async def upload_data_entry(
             additional_metadata=additional_metadata,
         )
 
-        return data_entry
+        return DataEntryUploadResponse(
+            data_entry=DataEntryInfo.model_validate(data_entry)
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
@@ -130,3 +162,95 @@ async def upload_data_entry(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing data entry: {str(e)}",
         ) from e
+
+
+@router.post("/{data_entry_id}/process")
+async def process_data_entry(
+    data_entry_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_postgres_db),
+) -> Dict[str, Any]:
+    """
+    Trigger processing of a data entry.
+
+    Args:
+        data_entry_id: ID of the data entry to process
+        background_tasks: FastAPI background tasks
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Dict with processing status
+    """
+    # Check if data entry exists
+    data_entry = db.query(DataEntry).filter(DataEntry.id == data_entry_id).first()
+    if not data_entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Data entry with ID {data_entry_id} not found",
+        )
+
+    # Check if user has access to the data source
+    has_access = await check_data_source_access(data_entry.source_id, current_user, db)
+    if not has_access and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this data entry's source",
+        )
+
+    # Trigger processing
+    result = await trigger_data_processing(data_entry, background_tasks, db)
+
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result["message"],
+        )
+
+    return result
+
+
+@router.get("/{data_entry_id}/status")
+async def get_processing_status(
+    data_entry_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_postgres_db),
+) -> Dict[str, Any]:
+    """
+    Get the processing status of a data entry.
+
+    Args:
+        data_entry_id: ID of the data entry
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        Dict with processing status
+    """
+    # Check if data entry exists
+    data_entry = db.query(DataEntry).filter(DataEntry.id == data_entry_id).first()
+    if not data_entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Data entry with ID {data_entry_id} not found",
+        )
+
+    # Check if user has access to the data source
+    has_access = await check_data_source_access(data_entry.source_id, current_user, db)
+    if not has_access and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this data entry's source",
+        )
+
+    # Get status
+    status_result = await get_data_entry_status(data_entry_id, db)
+
+    if not status_result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=status_result["message"],
+        )
+
+    return status_result
