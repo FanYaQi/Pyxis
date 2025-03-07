@@ -22,35 +22,13 @@ from pyxis_app.postgres.models.pyxis_field import (
 class PyxisFieldMetaBase(BaseModel):
     """Base schema for PyxisFieldMeta"""
 
-    pyxis_field_id: str = Field(
+    pyxis_field_code: str = Field(
         ..., description="Unique identifier for the Pyxis field"
     )
     name: Optional[str] = Field(None, description="Name of the field")
     country: Optional[str] = Field(
         None, description="Country where the field is located"
     )
-    centroid_h3_index: Optional[str] = Field(
-        None, description="H3 index of the field centroid"
-    )
-
-    # Geometry will be handled separately since it's a special type
-
-
-class PyxisFieldMetaCreate(PyxisFieldMetaBase):
-    """Schema for creating a new PyxisFieldMeta"""
-
-    geometry_wkt: Optional[str] = Field(
-        None, description="WKT representation of the geometry"
-    )
-
-
-class PyxisFieldMetaUpdate(BaseModel):
-    """Schema for updating a PyxisFieldMeta"""
-
-    name: Optional[str] = None
-    country: Optional[str] = None
-    centroid_h3_index: Optional[str] = None
-    geometry_wkt: Optional[str] = None
 
 
 class PyxisFieldMetaResponse(PyxisFieldMetaBase):
@@ -66,7 +44,7 @@ class PyxisFieldMetaResponse(PyxisFieldMetaBase):
 class PyxisFieldDataBase(BaseModel):
     """Base schema for PyxisFieldData"""
 
-    pyxis_field_meta_id: int = Field(
+    pyxis_field_meta_id: Optional[int] = Field(
         ..., description="Reference to the Pyxis field meta ID"
     )
     data_entry_id: int = Field(..., description="Reference to the data entry ID")

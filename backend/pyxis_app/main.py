@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 from .routers import (
     database,
-    data_source_access,
     data_sources,
     data_entries,
     pyxis,
@@ -47,7 +46,6 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(database.router)
 app.include_router(data_sources.router, prefix="/api/v1")
-app.include_router(data_source_access.router, prefix="/api/v1")
 app.include_router(data_entries.router, prefix="/api/v1")
 app.include_router(pyxis.router, prefix="/api/v1")
 
