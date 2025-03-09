@@ -2,6 +2,7 @@
 """Main module for Pyxis API."""
 # pylint: disable=C0301
 import os
+from logging import basicConfig
 
 import logfire
 from fastapi import FastAPI
@@ -16,6 +17,7 @@ from .routers import (
     pyxis,
     auth,
 )
+from .postgres.database import engine
 
 # Load environment variables
 load_dotenv()
@@ -54,7 +56,9 @@ app.include_router(pyxis.router, prefix="/api/v1")
 
 # Configure Logfire
 logfire.configure()
+basicConfig(handlers=[logfire.LogfireLoggingHandler()])
 logfire.instrument_system_metrics()
+logfire.instrument_sqlalchemy(engine)
 logfire.instrument_pydantic()
 logfire.instrument_fastapi(app)
 

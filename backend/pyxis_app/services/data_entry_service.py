@@ -2,11 +2,12 @@
 import io
 import json
 import logging
+import hashlib
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 
-import hashlib
+import logfire
 import pandas as pd
 from fastapi import BackgroundTasks, UploadFile
 from pydantic import ValidationError
@@ -207,8 +208,7 @@ async def trigger_data_processing(
     }
 
 
-# TODO: Integrate with logfire for monitoring background tasks
-# TODO: Add monitoring for data entry processing
+@logfire.instrument('Background data processing task for data entry {data_entry=}')
 def process_data_entry_background(data_entry: DataEntry, db: Session) -> None:
     """
     Process a data entry in the background.
@@ -221,16 +221,17 @@ def process_data_entry_background(data_entry: DataEntry, db: Session) -> None:
         logger.info("Starting background processing for data entry %s", data_entry.id)
 
         # Process data based on file type
-        if data_entry.file_extension == FileExtension.CSV:
-            process_csv_data(data_entry, db)
-        else:
-            # Set error for unsupported file types
-            data_entry.status = ProcessingStatus.FAILED
-            data_entry.error_message = (
-                f"Unsupported file extension: {data_entry.file_extension}"
-            )
-            logger.error("Unsupported file extension: %s", data_entry.file_extension)
-            return
+        with logfire.span(f"Process data for type {data_entry.file_extension}"):
+            if data_entry.file_extension == FileExtension.CSV:
+                process_csv_data(data_entry, db)
+            else:
+                # Set error for unsupported file types
+                data_entry.status = ProcessingStatus.FAILED
+                data_entry.error_message = (
+                    f"Unsupported file extension: {data_entry.file_extension}"
+                )
+                logger.error("Unsupported file extension: %s", data_entry.file_extension)
+                return
 
         # Update status to COMPLETED
         data_entry.status = ProcessingStatus.COMPLETED
