@@ -26,6 +26,7 @@ def parse_cors(v: Any) -> list[str] | str:
 
 class Settings(BaseSettings):
     """Settings for the application."""
+
     model_config = SettingsConfigDict(
         env_file=".env",  # Use .env file (backend/.env)
         env_ignore_empty=True,  # Empty env vars in .env ignored.

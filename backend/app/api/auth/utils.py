@@ -8,7 +8,6 @@ from app.postgres.models import User
 from app.api.deps import CurrentUser
 
 
-
 async def get_current_active_user(
     current_user: CurrentUser,
 ):

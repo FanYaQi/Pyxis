@@ -51,6 +51,7 @@ logfire.instrument_sqlalchemy(engine)
 logfire.instrument_pydantic()
 logfire.instrument_fastapi(app)
 
+
 @app.get("/", tags=["root"])
 async def root():
     """Root endpoint for Pyxis API."""

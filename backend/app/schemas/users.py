@@ -47,6 +47,7 @@ class UserPublic(UserBase):
     id: uuid.UUID
     oauth_provider: Optional[str]
 
+
 class UsersPublic(BaseModel):
     data: list[UserPublic]
     count: int
