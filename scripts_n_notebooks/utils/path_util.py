@@ -1,4 +1,4 @@
 import os
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data')
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data")
 # OUT_PATH = os.path.join(os.path.dirname(__file__), '..', 'outputs')

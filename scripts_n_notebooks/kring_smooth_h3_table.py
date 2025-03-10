@@ -4,7 +4,10 @@ import h3pandas
 import pandas as pd
 from utils.path_util import DATA_PATH
 
-def kring_smooth_h3_table(db_params, id_column, h3_column, table_name, new_table_name, k):
+
+def kring_smooth_h3_table(
+    db_params, id_column, h3_column, table_name, new_table_name, k
+):
     try:
         # Establish a database connection
         conn = psycopg2.connect(**db_params)
@@ -19,18 +22,21 @@ def kring_smooth_h3_table(db_params, id_column, h3_column, table_name, new_table
 
         # Fetch all H3 cell indexes
         rows = cursor.fetchall()
-        original_table = pd.DataFrame(columns=[id_column,h3_column])
+        original_table = pd.DataFrame(columns=[id_column, h3_column])
         # Smooth the H3 cell by k_ring
         for row in rows:
-            original_table = pd.concat([original_table,pd.DataFrame([row],columns=[id_column,h3_column])],ignore_index=True)
+            original_table = pd.concat(
+                [original_table, pd.DataFrame([row], columns=[id_column, h3_column])],
+                ignore_index=True,
+            )
 
         original_table = original_table.set_index([h3_column])
-        smoothed_table = original_table.h3.k_ring(k,explode=True)
+        smoothed_table = original_table.h3.k_ring(k, explode=True)
 
-        #drop duplicate h3 index for same id
-        smoothed_table = smoothed_table.drop_duplicates(subset=[id_column,'h3_k_ring'])
+        # drop duplicate h3 index for same id
+        smoothed_table = smoothed_table.drop_duplicates(subset=[id_column, "h3_k_ring"])
 
-        #create new table for the smoothed h3 index
+        # create new table for the smoothed h3 index
         create_table_query = f"""
         CREATE TABLE {new_table_name} (
             {id_column} numeric,
@@ -47,7 +53,7 @@ def kring_smooth_h3_table(db_params, id_column, h3_column, table_name, new_table
 
         for _, row in smoothed_table.iterrows():
             id = row[id_column]
-            h3_index = row['h3_k_ring']
+            h3_index = row["h3_k_ring"]
             cursor.execute(insert_query, (id, h3_index))
 
         conn.commit()
@@ -62,12 +68,13 @@ def kring_smooth_h3_table(db_params, id_column, h3_column, table_name, new_table
         if conn:
             conn.close()
 
+
 if __name__ == "__main__":
     db_params = {
         "host": "localhost",
         "database": "postgres",
         "user": "yaqifan",
-        "password": "6221"
+        "password": "6221",
     }
     h3_column = "h3_index"
     id_column = "id"
@@ -75,4 +82,4 @@ if __name__ == "__main__":
     table_name = "tm_zhan_h3_9"
     output_table = f"{table_name}_{k}ring_smooth"
 
-    kring_smooth_h3_table(db_params,id_column, h3_column, table_name, output_table, k)
+    kring_smooth_h3_table(db_params, id_column, h3_column, table_name, output_table, k)
