@@ -1,21 +1,10 @@
-import os
-
-import logfire
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Load environment variables from .env
-# First, look in current directory
-if os.path.exists(".env"):
-    load_dotenv()
-# Then look in project root (in case running from web/ directory)
-elif os.path.exists("../.env"):
-    load_dotenv("../.env")
+from app.configs.settings import settings
 
-# Default if not found in environment
-DEFAULT_DB_URL = "postgresql+psycopg2://postgres:postgres@localhost:5555/pyxis"
-SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL", DEFAULT_DB_URL)
+
+SQLALCHEMY_DATABASE_URL = str(settings.SQLALCHEMY_DATABASE_URI)
 
 print(f"Connecting to database: {SQLALCHEMY_DATABASE_URL}")
 

@@ -2,14 +2,11 @@
 Authentication utilities
 TODO: move to somewhere else.
 """
-from dotenv import load_dotenv
 from fastapi import HTTPException
 
 from app.postgres.models import User
 from app.api.deps import CurrentUser
 
-
-load_dotenv()
 
 
 async def get_current_active_user(

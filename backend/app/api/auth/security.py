@@ -21,12 +21,12 @@ class TokenData(BaseModel):
 def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
     expire = datetime.now(timezone.utc) + expires_delta
     to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
 def decode_token(token: str) -> TokenData:
-    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
     token_data = TokenData(**payload)
     return token_data
 
@@ -46,12 +46,12 @@ def generate_password_reset_token(email: str) -> str:
     exp = expires.timestamp()
     encoded_jwt = jwt.encode(
         {"exp": exp, "nbf": now, "sub": email},
-        settings.SECRET_KEY,
+        settings.JWT_SECRET_KEY,
         algorithm=ALGORITHM,
     )
     return encoded_jwt
 
 
 def verify_password_reset_token(token: str) -> str:
-    decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+    decoded_token = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
     return str(decoded_token["sub"])

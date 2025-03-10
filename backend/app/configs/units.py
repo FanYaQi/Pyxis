@@ -23,7 +23,7 @@ The unit registry is defined as a singleton in the settings module.
 import pint
 
 # Create a unit registry
-ureg = pint.UnitRegistry()
+ureg = pint.UnitRegistry(on_redefinition="ignore")
 
 # Define custom units relevant to oil and gas industry and carbon emissions
 # Note: Many common units are already defined in Pint

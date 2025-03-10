@@ -25,17 +25,23 @@ def parse_cors(v: Any) -> list[str] | str:
 
 
 class Settings(BaseSettings):
+    """Settings for the application."""
     model_config = SettingsConfigDict(
-        # Use top level .env file (one level above ./backend/)
-        # TODO: fix this.
-        env_file="../.env",
-        env_ignore_empty=True,
-        extra="ignore",
+        env_file=".env",  # Use .env file (backend/.env)
+        env_ignore_empty=True,  # Empty env vars in .env ignored.
+        extra="ignore",  # Extra env vars ignored.
     )
+
     AUTH_ENABLED: bool = True
     API_V1_STR: str = "/api/v1"
-    # TODO: understand this.
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = "set-google-client-id"
+    GOOGLE_CLIENT_SECRET: str = "set-google-client-sceret"
+
+    # Secret keys
+    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
+    SESSION_SECRET_KEY: str = secrets.token_urlsafe(32)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     FRONTEND_HOST: str = "http://localhost:5173"
@@ -59,9 +65,8 @@ class Settings(BaseSettings):
         ]
 
     PROJECT_NAME: str = "Pyxis"
-    # SENTRY_DSN: HttpUrl | None = None
     POSTGRES_SERVER: str = "localhost"
-    POSTGRES_PORT: int = 5432
+    POSTGRES_PORT: int = 5555
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "pyxis"
@@ -71,7 +76,7 @@ class Settings(BaseSettings):
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
         return PostgresDsn(
             MultiHostUrl.build(
-                scheme="postgresql+psycopg",
+                scheme="postgresql+psycopg2",
                 username=self.POSTGRES_USER,
                 password=self.POSTGRES_PASSWORD,
                 host=self.POSTGRES_SERVER,
@@ -115,7 +120,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _enforce_non_default_secrets(self) -> Self:
-        self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
+        self._check_default_secret("JWT_SECRET_KEY", self.JWT_SECRET_KEY)
+        self._check_default_secret("SESSION_SECRET_KEY", self.SESSION_SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
         self._check_default_secret(
             "FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD

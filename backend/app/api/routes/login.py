@@ -12,7 +12,7 @@ from app.services import user_service
 from app.api.common import Message
 from app.api.deps import DBSessionDep
 from app.api.auth.utils import get_current_active_superuser
-from app.api.auth.oauth import oauth, get_or_create_user
+from app.api.auth.oauth import oauth, get_or_create_oauth_user
 from app.configs.settings import settings
 from app.api.auth.security import (
     get_password_hash,
@@ -90,11 +90,11 @@ async def auth_google_callback(
         )
 
     # Get or create user
-    user = await get_or_create_user(user_info, db)
+    user = await get_or_create_oauth_user(user_info, db)
 
     # Create JWT token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(user.email, expires_delta=access_token_expires)
+    access_token = create_access_token(user.id, expires_delta=access_token_expires)
 
     # Set cookie with token for client-side
     response = Response(

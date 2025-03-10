@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel, Field
 
@@ -119,7 +119,8 @@ class DataEntryConfiguration(BaseModel):
     def get_source_attribute_map(self) -> Dict[str, Attribute]:
         """Get a dictionary mapping source attributes to their metadata"""
         return {
-            attribute.name: attribute for attribute in self.data_metadata.attributes
+            attribute.name: attribute
+            for attribute in self.data_metadata.attributes  # pylint: disable=E1101
         }
 
     def get_attributes_metadata_map(self) -> Dict[str, Attribute]:
@@ -128,5 +129,6 @@ class DataEntryConfiguration(BaseModel):
             raise ValueError("Data metadata is not set")
 
         return {
-            attribute.name: attribute for attribute in self.data_metadata.attributes
+            attribute.name: attribute
+            for attribute in self.data_metadata.attributes  # pylint: disable=E1101
         }

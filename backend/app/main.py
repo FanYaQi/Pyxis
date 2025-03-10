@@ -1,26 +1,16 @@
 # backend/app/main.py
 """Main module for Pyxis API."""
 # pylint: disable=C0301
-import os
 from logging import basicConfig
 
 import logfire
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from dotenv import load_dotenv
 
 from .api.main import router
 from .postgres.database import engine
 from .configs.settings import settings
-
-# Load environment variables
-load_dotenv()
-
-# Get session secret key from environment or use a default for development
-SESSION_SECRET_KEY = os.getenv(
-    "SESSION_SECRET_KEY", "dev-session-secret-key-change-this-in-production"
-)
 
 
 app = FastAPI(
@@ -31,7 +21,7 @@ app = FastAPI(
 )
 
 # Add SessionMiddleware - required for OAuth flows
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY)
 
 # Add CORS middleware if needed
 app.add_middleware(
