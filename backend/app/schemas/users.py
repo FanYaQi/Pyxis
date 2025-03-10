@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class Token(BaseModel):
@@ -14,6 +14,8 @@ class UserBase(BaseModel):
     is_active: bool = True
     is_superuser: bool = False
     full_name: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserCreate(UserBase):
@@ -41,10 +43,10 @@ class UpdatePassword(BaseModel):
     new_password: str = Field(min_length=8, max_length=40)
 
 
-class UserResponse(BaseModel):
+class UserPublic(UserBase):
     id: uuid.UUID
-    email: EmailStr
-    is_active: bool
-    is_superuser: bool
-    full_name: Optional[str]
     oauth_provider: Optional[str]
+
+class UsersPublic(BaseModel):
+    data: list[UserPublic]
+    count: int

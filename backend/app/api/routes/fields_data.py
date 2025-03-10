@@ -18,10 +18,7 @@ from app.schemas.pyxis_field import (
 from app.api.deps import CurrentUser, DBSessionDep
 from app.services.data_source_service import check_data_source_access
 
-router = APIRouter(
-    prefix="/fields",
-    tags=["Fields Data"],
-)
+router = APIRouter(prefix="/fields", tags=["fields"])
 
 
 @router.get("/", response_model=List[PyxisFieldDataResponse])

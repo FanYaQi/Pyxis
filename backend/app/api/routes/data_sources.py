@@ -11,12 +11,12 @@ from app.api.deps import CurrentUser, DBSessionDep
 from app.postgres.models import User, DataSourceMeta
 from app.schemas.data_source import DataSourceMetaCreate, DataSourceMetaResponse
 from app.services.data_source_service import check_data_source_access
-from app.schemas.users import UserResponse
+from app.schemas.users import UserPublic
 
 
 router = APIRouter(
     prefix="/data-sources",
-    tags=["Data Sources"],
+    tags=["data-sources"],
 )
 
 
@@ -84,7 +84,7 @@ async def list_my_data_sources(
 
 
 # List users with access to a data source
-@router.get("/{data_source_id}/users", response_model=List[UserResponse])
+@router.get("/{data_source_id}/users", response_model=List[UserPublic])
 async def list_data_source_users(
     data_source_id: int,
     current_user: CurrentUser,
@@ -109,7 +109,7 @@ async def list_data_source_users(
         )
 
     # Return list of users with access
-    return [UserResponse.model_validate(user) for user in data_source.users]
+    return [UserPublic.model_validate(user) for user in data_source.users]
 
 
 # Grant access to a data source

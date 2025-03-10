@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List
+from typing import Any
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
@@ -20,12 +20,13 @@ from app.utils.email_utils import (
 )
 from app.api.common import Message
 from app.schemas.users import (
-    UserResponse,
+    UserPublic,
     UserCreate,
     UserUpdateMe,
     UserUpdate,
     UserSignup,
     UpdatePassword,
+    UsersPublic,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get(
     "/",
     dependencies=[Depends(get_current_active_superuser)],
-    response_model=List[UserResponse],
+    response_model=UsersPublic,
 )
 def read_users(db: DBSessionDep, skip: int = 0, limit: int = 100) -> Any:
     """
@@ -47,18 +48,18 @@ def read_users(db: DBSessionDep, skip: int = 0, limit: int = 100) -> Any:
     count = db.scalar(count_statement)
 
     statement = select(User).offset(skip).limit(limit)
-    users = db.execute(statement).all()
+    users = db.execute(statement).scalars().all()
 
-    return {
-        "users": [UserResponse.model_validate(user) for user in users],
-        "total": count,
-    }
+    return UsersPublic(
+        data=[UserPublic.model_validate(user) for user in users],
+        count=count or 0,
+    )
 
 
 @router.post(
     "/",
     dependencies=[Depends(get_current_active_superuser)],
-    response_model=UserResponse,
+    response_model=UserPublic,
 )
 def create_user(*, session: DBSessionDep, user_in: UserCreate) -> Any:
     """
@@ -84,7 +85,7 @@ def create_user(*, session: DBSessionDep, user_in: UserCreate) -> Any:
     return user
 
 
-@router.patch("/me", response_model=UserResponse)
+@router.patch("/me", response_model=UserPublic)
 def update_user_me(
     *, session: DBSessionDep, user_in: UserUpdateMe, current_user: CurrentUser
 ) -> Any:
@@ -140,7 +141,7 @@ def update_password_me(
     return Message(message="Password updated successfully")
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserPublic)
 def read_user_me(current_user: CurrentUser) -> Any:
     """
     Get current user.
@@ -162,7 +163,7 @@ def delete_user_me(session: DBSessionDep, current_user: CurrentUser) -> Any:
     return Message(message="User deleted successfully")
 
 
-@router.post("/signup", response_model=UserResponse)
+@router.post("/signup", response_model=UserPublic)
 def register_user(session: DBSessionDep, user_in: UserSignup) -> Any:
     """
     Create new user without the need to be logged in.
@@ -178,7 +179,7 @@ def register_user(session: DBSessionDep, user_in: UserSignup) -> Any:
     return user
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserPublic)
 def read_user_by_id(
     user_id: uuid.UUID, session: DBSessionDep, current_user: CurrentUser
 ) -> Any:
@@ -199,7 +200,7 @@ def read_user_by_id(
 @router.patch(
     "/{user_id}",
     dependencies=[Depends(get_current_active_superuser)],
-    response_model=UserResponse,
+    response_model=UserPublic,
 )
 def update_user(
     *,

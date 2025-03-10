@@ -8,7 +8,7 @@ from app.api.auth.security import get_password_hash
 from app.postgres.models import (
     User,
 )
-from app.schemas.users import UserResponse
+from app.schemas.users import UserPublic
 from app.utils.email_utils import generate_test_email, send_email
 from app.api.common import Message
 from app.api.auth.utils import get_current_active_superuser
@@ -24,7 +24,7 @@ class PrivateUserCreate(BaseModel):
     is_verified: bool = False
 
 
-@router.post("/users/", response_model=UserResponse)
+@router.post("/users/", response_model=UserPublic)
 def create_user(user_in: PrivateUserCreate, session: DBSessionDep) -> Any:
     """
     Create a new user.

@@ -30,7 +30,7 @@ from app.services.data_source_service import check_data_source_access
 from app.api.deps import CurrentUser, DBSessionDep
 
 
-router = APIRouter(prefix="/data-entries", tags=["Data Entry"])
+router = APIRouter(prefix="/data-entries", tags=["data-entries"])
 
 
 class DataEntryUploadForm(BaseModel):

@@ -23,7 +23,7 @@ from app.api.auth.security import (
 from app.utils.email_utils import generate_reset_password_email, send_email
 
 
-router = APIRouter(prefix="/login", tags=["Authentication"])
+router = APIRouter(prefix="/login", tags=["login"])
 
 
 class Token(BaseModel):

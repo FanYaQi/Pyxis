@@ -10,7 +10,7 @@ from app.configs.settings import settings
 
 router = APIRouter(
     prefix="/database",
-    tags=["Database"],
+    tags=["database"],
 )
 
 
