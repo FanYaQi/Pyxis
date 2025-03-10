@@ -11,6 +11,8 @@ pydantic = ">=2.10.6, <3.0.0"
 geoalchemy2 = {extras = ["shapely"], version = "~=0.17.1"}
 psycopg2 = "~=2.9.10"
 python-dotenv = "~=1.0.1"
+# Data processing
+pint = "~=0.24.4"  # Scientific units handling.
 pandas = "~=2.0.3"
 h3 = "~=3.7.7"
 shapely = "~=2.0.1"
@@ -19,12 +21,11 @@ matplotlib = "~=3.7.2"
 seaborn = "~=0.13.2"
 scikit-learn = "~=1.4.2"
 jsonschema = "~=4.23.0"
-bcrypt = "~=4.3.0"
+# Security and authentication
+# Pin bcrypt until passlib supports the latest
+bcrypt = "==4.0.1"
 authlib = "~=1.5.1"
 python-jose = {extras = ["cryptography"], version = "~=3.4.0"}
-python-multipart = "~=0.0.6"
-email-validator = "~=2.1.0"
-pint = "~=0.24.4"
 # Observability
 logfire = {extras = ["system-metrics", "fastapi", "sqlalchemy", "psycopg2"], version = "*"}
 opentelemetry-instrumentation-sqlite3 = "*"
@@ -35,6 +36,11 @@ opentelemetry-instrumentation-fastapi = "*"
 opentelemetry-instrumentation-requests = "*"
 opentelemetry-instrumentation-httpx = "*"
 opentelemetry-instrumentation-sqlalchemy = "*"
+# Others
+email-validator = "~=2.1.0"
+emails = ">= 0.6, < 1.0"
+python-multipart = "~=0.0.6"
+
 
 [dev-packages]
 black = "~=23.3.0"

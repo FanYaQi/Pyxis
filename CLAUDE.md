@@ -1,7 +1,7 @@
 # CLAUDE.md - Guide for Agent Coding in Pyxis
 
 ## Build/Run/Test Commands
-- Web server: `cd backend && pipenv run uvicorn pyxis_app.main:app --reload`
+- Web server: `cd backend && pipenv run uvicorn app.main:app --reload`
 - Format code: `cd backend && pipenv run black .`
 
 ## Code Style Guidelines
