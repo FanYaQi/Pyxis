@@ -23,6 +23,7 @@ scikit-learn = "~=1.4.2"
 jsonschema = "~=4.23.0"
 # Security and authentication
 # Pin bcrypt until passlib supports the latest
+passlib = "~=1.7.4"
 bcrypt = "==4.0.1"
 authlib = "~=1.5.1"
 python-jose = {extras = ["cryptography"], version = "~=3.4.0"}
