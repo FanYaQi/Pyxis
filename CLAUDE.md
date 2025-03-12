@@ -16,6 +16,7 @@
 ## Project Structure
 - `/scripts_n_notebooks`: Data processing scripts, utilities and notebooks, do not modify code here.
 - `/backend`: FastAPI web application
+- `/frontend`: Pyxis frontend.
 - `/docs`: Documentation and diagrams
 
 # Background: Pyxis Project
