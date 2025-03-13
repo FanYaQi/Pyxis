@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test"
-import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
-import { randomPassword } from "./utils/random.ts"
+import { firstSuperuser, firstSuperuserPassword } from "./config.js"
+import { randomPassword } from "./utils/random.js"
 
 test.use({ storageState: { cookies: [], origins: [] } })
 
