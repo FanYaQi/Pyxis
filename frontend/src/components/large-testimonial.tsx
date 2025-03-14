@@ -1,5 +1,4 @@
 import Image from "next/image";
-import TestimonialImg from "@/public/images/large-testimonial.jpg";
 
 export default function LargeTestimonial() {
   return (
@@ -23,7 +22,7 @@ export default function LargeTestimonial() {
               </svg>
               <Image
                 className="rounded-full"
-                src={TestimonialImg}
+                src="/images/large-testimonial.jpg"
                 width={48}
                 height={48}
                 alt="Large testimonial"
