@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from typing import Annotated, Any
 
@@ -38,13 +39,13 @@ class NewPassword(BaseModel):
 
 @router.post("/access-token")
 def login_access_token(
-    session: DBSessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-) -> Token:
+    db: DBSessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+):
     """
     OAuth2 compatible token login, get an access token for future requests
     """
     user = user_service.authenticate(
-        session=session, email=form_data.username, password=form_data.password
+        session=db, email=form_data.username, password=form_data.password
     )
     if not user:
         raise HTTPException(
@@ -60,10 +61,24 @@ def login_access_token(
 
     # Create token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
+    token = Token(
         access_token=create_access_token(user.id, expires_delta=access_token_expires),
         token_type="bearer",
     )
+    response = Response(
+        content=json.dumps(token.model_dump()),
+        media_type="application/json",
+    )
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {token.access_token}",
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="none", # TODO: Set to lax in production
+        secure=True
+    )
+    return response
 
 
 # OAuth routes for Google
@@ -108,7 +123,7 @@ async def auth_google_callback(
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
-        secure=False,  # TODO: Set to True in production with HTTPS
+        secure=True
     )
 
     return response
