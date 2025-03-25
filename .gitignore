@@ -1,7 +1,9 @@
 # Mac
 **/.DS_Store
+#data
 
 # Files
+scripts_n_notebooks/data
 docs/legacy
 
 # Sensitive Information
