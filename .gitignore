@@ -2,10 +2,7 @@
 **/.DS_Store
 
 # Files
-db/data/
-db/docs/
-db/notebooks/test.ipynb
-db/data_processing/test.py
+docs/legacy
 
 # Sensitive Information
 .pyxis_pass
