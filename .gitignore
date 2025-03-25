@@ -1,11 +1,10 @@
 # Mac
 **/.DS_Store
+#data
 
 # Files
-db/data/
-db/docs/
-db/notebooks/test.ipynb
-db/data_processing/test.py
+scripts_n_notebooks/data
+docs/legacy
 
 # Sensitive Information
 .pyxis_pass

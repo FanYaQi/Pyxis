@@ -1,0 +1,200 @@
+{
+  "rules": {
+    "functional_unit": {
+      "method": "most_frequent"
+    },
+    "downhole_pump": {
+      "method": "most_frequent"
+    },
+    "water_reinjection": {
+      "method": "most_frequent"
+    },
+    "natural_gas_reinjection": {
+      "method": "most_frequent"
+    },
+    "water_flooding": {
+      "method": "most_frequent"
+    },
+    "gas_lifting": {
+      "method": "most_frequent"
+    },
+    "gas_flooding": {
+      "method": "most_frequent"
+    },
+    "steam_flooding": {
+      "method": "most_frequent"
+    },
+    "oil_sands_mine_type": {
+      "method": "most_frequent"
+    },
+    "age": {
+      "method": "custom",
+      "function": "avg_age"
+    },
+    "depth": {
+      "method": "average"
+    },
+    "oil_prod": {
+      "method": "average"
+    },
+    "num_prod_wells": {
+      "method": "average",
+      "round": "integer"
+    },
+    "num_water_inj_wells": {
+      "method": "average",
+      "round": "integer"
+    },
+    "well_diam": {
+      "method": "average"
+    },
+    "prod_index": {
+      "method": "average"
+    },
+    "res_press": {
+      "method": "average"
+    },
+    "res_temp": {
+      "method": "average"
+    },
+    "offshore": {
+      "method": "most_frequent"
+    },
+    "api": {
+      "method": "average"
+    },
+    "gas_comp_n2": {
+      "method": "average"
+    },
+    "gas_comp_co2": {
+      "method": "average"
+    },
+    "gas_comp_c1": {
+      "method": "average"
+    },
+    "gas_comp_c2": {
+      "method": "average"
+    },
+    "gas_comp_c3": {
+      "method": "average"
+    },
+    "gas_comp_c4": {
+      "method": "average"
+    },
+    "gas_comp_h2s": {
+      "method": "average"
+    },
+    "gor": {
+      "method": "average"
+    },
+    "wor": {
+      "method": "average"
+    },
+    "wir": {
+      "method": "average"
+    },
+    "glir": {
+      "method": "average"
+    },
+    "gfir": {
+      "method": "average"
+    },
+    "flood_gas_type": {
+      "method": "most_frequent"
+    },
+    "frac_co2_breakthrough": {
+      "method": "average"
+    },
+    "co2_source": {
+      "method": "most_frequent"
+    },
+    "perc_sequestration_credit": {
+      "method": "average"
+    },
+    "sor": {
+      "method": "average"
+    },
+    "fraction_elec_onsite": {
+      "method": "average"
+    },
+    "fraction_remaining_gas_inj": {
+      "method": "average"
+    },
+    "fraction_water_reinjected": {
+      "method": "average"
+    },
+    "fraction_steam_cogen": {
+      "method": "average"
+    },
+    "fraction_steam_solar": {
+      "method": "average"
+    },
+    "heater_treater": {
+      "method": "most_frequent"
+    },
+    "stabilizer_column": {
+      "method": "most_frequent"
+    },
+    "upgrader_type": {
+      "method": "most_frequent"
+    },
+    "gas_processing_path": {
+      "method": "most_frequent"
+    },
+    "for_value": {
+      "method": "average"
+    },
+    "frac_venting": {
+      "method": "average"
+    },
+    "fraction_diluent": {
+      "method": "average"
+    },
+    "ecosystem_richness": {
+      "method": "most_frequent"
+    },
+    "field_development_intensity": {
+      "method": "most_frequent"
+    },
+    "frac_transport_tanker": {
+      "method": "average"
+    },
+    "frac_transport_barge": {
+      "method": "average"
+    },
+    "frac_transport_pipeline": {
+      "method": "average"
+    },
+    "frac_transport_rail": {
+      "method": "average"
+    },
+    "frac_transport_truck": {
+      "method": "average"
+    },
+    "transport_dist_tanker": {
+      "method": "average"
+    },
+    "transport_dist_barge": {
+      "method": "average"
+    },
+    "transport_dist_pipeline": {
+      "method": "average"
+    },
+    "transport_dist_rail": {
+      "method": "average"
+    },
+    "transport_dist_truck": {
+      "method": "average"
+    },
+    "ocean_tanker_size": {
+      "method": "average"
+    },
+    "small_sources_emissions": {
+      "method": "average"
+    },
+    "additional_attributes": {
+      "method": "custom",
+      "function": "merge_dictionaries"
+    }
+  }
+}
