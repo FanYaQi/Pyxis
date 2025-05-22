@@ -75,8 +75,8 @@ def login_access_token(
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="none", # TODO: Set to lax in production
-        secure=True
+        samesite="none",  # TODO: Set to lax in production
+        secure=True,
     )
     return response
 
@@ -123,7 +123,7 @@ async def auth_google_callback(
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
-        secure=True
+        secure=True,
     )
 
     return response

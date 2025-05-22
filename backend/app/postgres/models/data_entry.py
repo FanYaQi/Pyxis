@@ -109,12 +109,12 @@ class DataEntry(Base):
     )  # List of files inside the archive (if applicable)
     # Optional fields - NULL means "valid all time"
     valid_from: Mapped[Optional[date]] = mapped_column(
-        index=True, 
-        comment="Start date when this data entry becomes valid (NULL means no start limit)"
+        index=True,
+        comment="Start date when this data entry becomes valid (NULL means no start limit)",
     )
     valid_to: Mapped[Optional[date]] = mapped_column(
-        index=True, 
-        comment="End date when this data entry stops being valid (NULL means no end limit)"
+        index=True,
+        comment="End date when this data entry stops being valid (NULL means no end limit)",
     )
     # Processing details
     status: Mapped[ProcessingStatus] = mapped_column(default=ProcessingStatus.PENDING)

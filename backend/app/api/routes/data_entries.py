@@ -46,10 +46,12 @@ class DataEntryUploadForm(BaseModel):
         None, description="Additional metadata(json format)"
     )
     valid_from: Optional[date] = Field(
-        None, description="Start date when this data entry becomes valid (NULL means no start limit)"
+        None,
+        description="Start date when this data entry becomes valid (NULL means no start limit)",
     )
     valid_to: Optional[date] = Field(
-        None, description="End date when this data entry stops being valid (NULL means no end limit)"
+        None,
+        description="End date when this data entry stops being valid (NULL means no end limit)",
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -94,14 +96,18 @@ async def upload_data_entry(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid JSON format for additional metadata: {str(e)}",
             ) from e
-        
+
     # Validate date range if both dates are provided
-    if form_data.valid_from and form_data.valid_to and form_data.valid_from > form_data.valid_to:
+    if (
+        form_data.valid_from
+        and form_data.valid_to
+        and form_data.valid_from > form_data.valid_to
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Valid from date must be before valid to date",
         )
-    
+
     # Check if source exists and user has access
     data_source = (
         db.query(DataSourceMeta)

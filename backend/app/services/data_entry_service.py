@@ -5,7 +5,7 @@ import hashlib
 import uuid
 import os
 import numpy as np
-from datetime import datetime,date
+from datetime import datetime, date
 from typing import Dict, Any, Optional, List, Tuple
 
 import logfire
@@ -128,8 +128,8 @@ async def validate_data_entry(
         config_file_md5=config_md5,
         status=ProcessingStatus.PENDING,  # Set to PENDING by default
         additional_metadata=additional_metadata,
-        valid_from=valid_from, 
-        valid_to=valid_to,      
+        valid_from=valid_from,
+        valid_to=valid_to,
     )
 
     # Save to database
@@ -231,22 +231,22 @@ async def trigger_data_processing(
 
 
 def calculate_match_score(
-    name1: Optional[str], 
-    name2: Optional[str], 
-    index1: Optional[str], 
-    index2: Optional[str], 
-    weights: List[float] = MATCH_WEIGHTS
+    name1: Optional[str],
+    name2: Optional[str],
+    index1: Optional[str],
+    index2: Optional[str],
+    weights: List[float] = MATCH_WEIGHTS,
 ) -> float:
     """
     Calculate match score based on name similarity and H3 distance.
-    
+
     Args:
         name1: Name of the first field
         name2: Name of the second field
         index1: H3 index of the first field
         index2: H3 index of the second field
         weights: Weights for name score and geo score [name_weight, geo_weight]
-        
+
     Returns:
         float: Match score between 0 and 100
     """
@@ -255,7 +255,7 @@ def calculate_match_score(
         name_score = fuzz.ratio(str(name1).lower(), str(name2).lower())
     else:
         name_score = 0
-    
+
     # Calculate geographical distance score
     if index1 is not None and index2 is not None:
         try:
@@ -270,7 +270,7 @@ def calculate_match_score(
             geo_score = -40
     else:
         geo_score = 0
-    
+
     # Combine scores using weights
     return weights[0] * name_score + weights[1] * geo_score
 
@@ -279,63 +279,60 @@ def find_matching_field(
     field_name: Optional[str],
     field_country: Optional[str],
     centroid_h3_index: Optional[str],
-    db: Session
+    db: Session,
 ) -> Tuple[Optional[PyxisFieldMeta], float]:
     """
     Find a matching PyxisFieldMeta based on name and location.
-    
+
     Args:
         field_name: Name of the field to match
         field_country: Country of the field
         centroid_h3_index: H3 index of the field
         db: Database session
-        
+
     Returns:
         Tuple of (matching_field, match_score) or (None, 0) if no match found
     """
     if not field_name:
         return None, 0
-    
+
     # Query for potential matches - filter by country if available to reduce candidates
     query = db.query(PyxisFieldMeta)
     if field_country:
         query = query.filter(PyxisFieldMeta.country == field_country)
-    
+
     potential_matches = query.all()
-    
+
     best_match = None
     best_score = 0
-    
+
     # Calculate match scores for each potential match
     for field in potential_matches:
         score = calculate_match_score(
-            field_name, 
-            field.name,
-            centroid_h3_index, 
-            field.centroid_h3_index
+            field_name, field.name, centroid_h3_index, field.centroid_h3_index
         )
-        
+
         if score > best_score:
             best_score = score
             best_match = field
-    
+
     # Return the best match if it meets the threshold
     if best_match and best_score >= MATCH_SCORE_THRESHOLD:
         return best_match, best_score
-    
+
     return None, best_score
 
 
 def load_merge_rules() -> Dict[str, str]:
     """
     Load merge rules from JSON file.
-    
+
     Returns:
         Dict with column names as keys and merge rules as values
     """
     try:
         if os.path.exists(MERGE_RULES_PATH):
-            with open(MERGE_RULES_PATH, 'r') as f:
+            with open(MERGE_RULES_PATH, "r") as f:
                 return json.load(f)
         else:
             # Default merge rules if file doesn't exist
@@ -367,17 +364,17 @@ def load_merge_rules() -> Dict[str, str]:
 def apply_merge_rule(data: List[Any], rule: str) -> Any:
     """
     Apply a merge rule to a list of data.
-    
+
     Args:
         data: List of values to merge
         rule: Rule to apply ('average', 'median', 'most frequent', etc.)
-        
+
     Returns:
         Merged value according to the rule
     """
     if not data:  # Early exit if data list is empty
         return None
-    
+
     # Convert all values to the same type if possible
     try:
         if all(isinstance(x, (int, float)) for x in data):
@@ -386,7 +383,7 @@ def apply_merge_rule(data: List[Any], rule: str) -> Any:
             data = [bool(x) for x in data]
     except (ValueError, TypeError):
         pass  # Keep original types if conversion fails
-    
+
     # Apply the specified rule
     if rule == "average":
         return np.average(data)
@@ -410,7 +407,7 @@ def apply_merge_rule(data: List[Any], rule: str) -> Any:
         return min(data)
     elif rule == "max":
         return max(data)
-    
+
     # Return as is if no rule matches or for unhandled types
     return data[0] if data else None
 
@@ -418,36 +415,36 @@ def apply_merge_rule(data: List[Any], rule: str) -> Any:
 def dissolve_geometries(geometries: List[Any]) -> Tuple[Any, Optional[str]]:
     """
     Dissolve geometries into a single geometry, ensuring all are valid WKT before processing.
-    
+
     Args:
         geometries: List of WKT geometry strings or shapely geometries
-        
+
     Returns:
         Tuple of (merged_geometry, centroid_h3_index)
     """
     valid_geometries = []
-    
+
     for geom in geometries:
         try:
             # Handle various geometry input types
             if geom is None:
                 continue
-                
+
             if isinstance(geom, str):
                 if geom == "None" or not geom.strip():
                     continue
                 shapely_geom = wkt.loads(geom)
-            elif hasattr(geom, '__geo_interface__'):
+            elif hasattr(geom, "__geo_interface__"):
                 # Handle shapely or other geo-interface compatible objects
                 shapely_geom = shape(geom.__geo_interface__)
             else:
                 # Try to convert from GeoAlchemy
                 shapely_geom = to_shape(geom)
-                
+
             valid_geometries.append(shapely_geom)
         except Exception as e:
             logger.warning(f"Error loading geometry: {str(e)}")
-    
+
     if valid_geometries:
         try:
             merged_geometry = unary_union(valid_geometries)
@@ -456,7 +453,7 @@ def dissolve_geometries(geometries: List[Any]) -> Tuple[Any, Optional[str]]:
             return from_shape(merged_geometry, srid=4326), centroid_h3_index
         except Exception as e:
             logger.error(f"Error merging geometries: {str(e)}")
-    
+
     return None, None
 
 
@@ -541,7 +538,7 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
 
     # Create a list of field data objects to bulk insert
     field_data_objects = []
-    
+
     # Track which PyxisFieldMeta records need to be updated
     fields_to_update = set()
 
@@ -549,88 +546,98 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
     for _, row in df.iterrows():
         # Extract mapped data from the row
         field_attrs = extract_field_attributes(row, config_model)
-        
+
         # Find or create a PyxisFieldMeta record
         field_meta, is_new = get_or_create_field_meta(field_attrs, db)
-        
+
         # Create a PyxisFieldData record
         field_data = create_field_data(field_meta, field_attrs, data_entry)
         field_data_objects.append(field_data)
-        
+
         # Add field_meta to the update list if it's not new
         # New fields will already have all the data from field_attrs
         if not is_new:
             fields_to_update.add(field_meta.id)
-    
+
     # Bulk insert field data objects
     if field_data_objects:
         db.add_all(field_data_objects)
         db.flush()  # Assign IDs without committing
-    
+
     # Update PyxisFieldMeta records with merged data
     for field_id in fields_to_update:
         update_field_meta_with_merged_data(field_id, db)
-    
+
     # Commit all changes
     db.commit()
 
 
-def extract_field_attributes(row: pd.Series, config: DataEntryConfiguration) -> Dict[str, Any]:
+def extract_field_attributes(
+    row: pd.Series, config: DataEntryConfiguration
+) -> Dict[str, Any]:
     """
     Extract field attributes from a CSV row based on mappings.
-    
+
     Args:
         row: Pandas Series row from CSV
         config: DataEntryConfiguration with mappings
-        
+
     Returns:
         Dictionary of field attributes with target attribute names as keys
     """
     field_attrs = {}
-    
+
     # Process each mapping
     for mapping in config.mappings:
         source_attr = mapping.source_attribute
         target_attr = mapping.target_attribute
-        
+
         # Map source attribute to target attribute if value exists
         if source_attr in row and pd.notna(row[source_attr]):
             source_attr_info = config.get_source_attribute_map().get(source_attr)
-            
+
             if source_attr_info:
                 try:
                     # Get attribute info for proper type conversion
-                    target_attr_info = PyxisFieldData.get_attribute_info_by_name(target_attr)
+                    target_attr_info = PyxisFieldData.get_attribute_info_by_name(
+                        target_attr
+                    )
                     field_attrs[target_attr] = convert_value(
                         row[source_attr], source_attr_info, target_attr_info
                     )
                 except (ValueError, KeyError) as e:
-                    logger.warning(f"Error converting {source_attr} to {target_attr}: {str(e)}")
+                    logger.warning(
+                        f"Error converting {source_attr} to {target_attr}: {str(e)}"
+                    )
                     # Store raw value if conversion fails
                     field_attrs[target_attr] = row[source_attr]
-    
+
     # Generate H3 index if we have lat/lon but no H3 index
-    if "centroid_h3_index" not in field_attrs and "latitude" in field_attrs and "longitude" in field_attrs:
+    if (
+        "centroid_h3_index" not in field_attrs
+        and "latitude" in field_attrs
+        and "longitude" in field_attrs
+    ):
         try:
             field_attrs["centroid_h3_index"] = h3.geo_to_h3(
-                field_attrs["latitude"], 
-                field_attrs["longitude"], 
-                resolution=9
+                field_attrs["latitude"], field_attrs["longitude"], resolution=9
             )
         except Exception as e:
             logger.warning(f"Failed to generate H3 index: {str(e)}")
-    
+
     return field_attrs
 
 
-def get_or_create_field_meta(field_attrs: Dict[str, Any], db: Session) -> Tuple[PyxisFieldMeta, bool]:
+def get_or_create_field_meta(
+    field_attrs: Dict[str, Any], db: Session
+) -> Tuple[PyxisFieldMeta, bool]:
     """
     Find or create a PyxisFieldMeta record based on field attributes.
-    
+
     Args:
         field_attrs: Dictionary of field attributes
         db: Database session
-        
+
     Returns:
         Tuple of (PyxisFieldMeta object, is_new flag)
     """
@@ -638,22 +645,21 @@ def get_or_create_field_meta(field_attrs: Dict[str, Any], db: Session) -> Tuple[
     field_name = field_attrs.get("name")
     field_country = field_attrs.get("country")
     centroid_h3_index = field_attrs.get("centroid_h3_index")
-    
+
     # Try to find a matching field
     matching_field, match_score = find_matching_field(
         field_name, field_country, centroid_h3_index, db
     )
-    
+
     if matching_field:
-        logger.info(f"Found matching field '{matching_field.name}' with score {match_score}")
+        logger.info(
+            f"Found matching field '{matching_field.name}' with score {match_score}"
+        )
         return matching_field, False
-    
+
     # Create new field meta if no match found
     logger.info(f"Creating new field '{field_name}' (no match found)")
-    new_field = PyxisFieldMeta(
-        pyxis_field_code=str(uuid.uuid4()),
-        **field_attrs
-    )
+    new_field = PyxisFieldMeta(pyxis_field_code=str(uuid.uuid4()), **field_attrs)
     db.add(new_field)
     db.flush()  # Get ID assigned by database
     return new_field, True
@@ -680,21 +686,21 @@ def create_field_data(
         "pyxis_field_meta_id": field_meta.id,
         "data_entry_id": data_entry.id,
     }
-    
+
     # Set effective dates based on data entry validity dates
     if data_entry.valid_from:
         data_dict["effective_start_date"] = datetime.combine(
             data_entry.valid_from, datetime.min.time()
         )
-    
+
     if data_entry.valid_to:
         data_dict["effective_end_date"] = datetime.combine(
             data_entry.valid_to, datetime.max.time()
         )
-    
+
     # Add all mapped field attributes
     data_dict.update(field_attrs)
-    
+
     # Create and return the field data object
     return PyxisFieldData(**data_dict)
 
@@ -702,7 +708,7 @@ def create_field_data(
 def update_field_meta_with_merged_data(field_id: int, db: Session) -> None:
     """
     Update a PyxisFieldMeta record with merged data from all associated PyxisFieldData records.
-    
+
     Args:
         field_id: ID of the PyxisFieldMeta to update
         db: Database session
@@ -712,29 +718,31 @@ def update_field_meta_with_merged_data(field_id: int, db: Session) -> None:
     if not field_meta:
         logger.error(f"Field meta with ID {field_id} not found for merging")
         return
-    
+
     # Load merge rules
     merge_rules = load_merge_rules()
     if not merge_rules:
         logger.warning("No merge rules found, using default rules")
-    
+
     # Get all field data for this field
-    field_data_records = db.query(PyxisFieldData).filter(
-        PyxisFieldData.pyxis_field_meta_id == field_id
-    ).all()
-    
+    field_data_records = (
+        db.query(PyxisFieldData)
+        .filter(PyxisFieldData.pyxis_field_meta_id == field_id)
+        .all()
+    )
+
     if not field_data_records:
         logger.warning(f"No field data records found for field ID {field_id}")
         return
-    
+
     # Collect values for each attribute to merge
     merged_values = {}
-    
+
     # Get all attributes that can be merged
     mergeable_attrs = set(merge_rules.keys()).intersection(
         set(PyxisFieldData.get_field_attributes())
     )
-    
+
     # Collect values for each attribute
     for attr in mergeable_attrs:
         values = []
@@ -742,12 +750,12 @@ def update_field_meta_with_merged_data(field_id: int, db: Session) -> None:
             value = getattr(record, attr)
             if value is not None:
                 values.append(value)
-        
+
         if values:
             rule = merge_rules.get(attr, "most frequent")
             merged_value = apply_merge_rule(values, rule)
             merged_values[attr] = merged_value
-    
+
     # Special handling for geometry
     geometries = [record.geometry for record in field_data_records if record.geometry]
     if geometries:
@@ -756,7 +764,7 @@ def update_field_meta_with_merged_data(field_id: int, db: Session) -> None:
             merged_values["geometry"] = merged_geometry
         if centroid_h3_index:
             merged_values["centroid_h3_index"] = centroid_h3_index
-    
+
     # Update field meta with merged values
     updates_made = False
     for attr, value in merged_values.items():
@@ -766,7 +774,7 @@ def update_field_meta_with_merged_data(field_id: int, db: Session) -> None:
             if value is not None and value != current_value:
                 setattr(field_meta, attr, value)
                 updates_made = True
-    
+
     # Save changes if any were made
     if updates_made:
         field_meta.updated_at = datetime.now()
