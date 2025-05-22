@@ -1,5 +1,5 @@
 from typing import Optional, Any, Dict, List
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.postgres.models.data_entry import (
@@ -38,5 +38,7 @@ class DataEntryInfo(BaseModel):
     additional_metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata for the entry"
     )
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
     created_at: datetime
     updated_at: datetime
