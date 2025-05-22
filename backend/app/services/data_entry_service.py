@@ -5,7 +5,7 @@ import hashlib
 import uuid
 import os
 import numpy as np
-from datetime import datetime
+from datetime import datetime,date
 from typing import Dict, Any, Optional, List, Tuple
 
 import logfire
@@ -56,6 +56,8 @@ async def validate_data_entry(
     file_extension: FileExtension,
     data_file: UploadFile,
     config_file: UploadFile,
+    valid_from: Optional[date] = None,
+    valid_to: Optional[date] = None,
     additional_metadata: Optional[Dict[str, Any]] = None,
 ) -> DataEntry:
     """
@@ -71,6 +73,8 @@ async def validate_data_entry(
         file_extension: Type of data file
         data_file: The uploaded data file
         config_file: The uploaded config file
+        valid_from: Optional start date for validity period (NULL means no start limit)
+        valid_to: Optional end date for validity period (NULL means no end limit)
         additional_metadata: Additional metadata to store
 
     Returns:
@@ -124,6 +128,8 @@ async def validate_data_entry(
         config_file_md5=config_md5,
         status=ProcessingStatus.PENDING,  # Set to PENDING by default
         additional_metadata=additional_metadata,
+        valid_from=valid_from, 
+        valid_to=valid_to,      
     )
 
     # Save to database
@@ -669,12 +675,22 @@ def create_field_data(
     Returns:
         PyxisFieldData object
     """
-    # Base field data attributes
+    # Base field data attributes with validity dates from data entry
     data_dict = {
         "pyxis_field_meta_id": field_meta.id,
         "data_entry_id": data_entry.id,
-        "effective_start_date": datetime.now(),
     }
+    
+    # Set effective dates based on data entry validity dates
+    if data_entry.valid_from:
+        data_dict["effective_start_date"] = datetime.combine(
+            data_entry.valid_from, datetime.min.time()
+        )
+    
+    if data_entry.valid_to:
+        data_dict["effective_end_date"] = datetime.combine(
+            data_entry.valid_to, datetime.max.time()
+        )
     
     # Add all mapped field attributes
     data_dict.update(field_attrs)

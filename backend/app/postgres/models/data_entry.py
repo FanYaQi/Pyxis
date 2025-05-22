@@ -9,7 +9,7 @@ granularity, and processing status.
 # pylint: disable=E1102,C0301
 import enum
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 from sqlalchemy import (
     String,
@@ -107,7 +107,15 @@ class DataEntry(Base):
     contained_files: Mapped[Optional[List[str]]] = mapped_column(
         JSON
     )  # List of files inside the archive (if applicable)
-
+    # Optional fields - NULL means "valid all time"
+    valid_from: Mapped[Optional[date]] = mapped_column(
+        index=True, 
+        comment="Start date when this data entry becomes valid (NULL means no start limit)"
+    )
+    valid_to: Mapped[Optional[date]] = mapped_column(
+        index=True, 
+        comment="End date when this data entry stops being valid (NULL means no end limit)"
+    )
     # Processing details
     status: Mapped[ProcessingStatus] = mapped_column(default=ProcessingStatus.PENDING)
     error_message: Mapped[Optional[str]]
