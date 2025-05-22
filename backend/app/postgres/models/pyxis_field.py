@@ -106,7 +106,7 @@ class PyxisFieldMeta(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pyxis_field_code: Mapped[str] = mapped_column(unique=True, index=True)
-    
+
     # Basic field information
     name: Mapped[Optional[str]] = mapped_column(index=True)
     country: Mapped[Optional[str]] = mapped_column(index=True)
@@ -115,227 +115,18 @@ class PyxisFieldMeta(Base):
     centroid_h3_index: Mapped[Optional[str]] = mapped_column(
         index=True, comment="H3 index of the field centroid"
     )
+    flare_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("flare.id"), comment="Reference to the matched flare ID"
+    )
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
         Geometry("POLYGON", srid=4326), comment="Geometry of the field"
-    )
-    
-    # Functional attributes
-    functional_unit: Mapped[Optional[FunctionalUnit]] = mapped_column(
-        comment="Whether the field produces primarily oil or gas"
-    )
-
-    # Production methods
-    downhole_pump: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses downhole pumps"
-    )
-    water_reinjection: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses water reinjection"
-    )
-    natural_gas_reinjection: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses natural gas reinjection"
-    )
-    water_flooding: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses water flooding"
-    )
-    gas_lifting: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses gas lifting"
-    )
-    gas_flooding: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses gas flooding"
-    )
-    steam_flooding: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field uses steam flooding"
-    )
-    oil_sands_mine_type: Mapped[Optional[OilSandsMineType]] = mapped_column(
-        comment="Type of oil sands mining operation, if applicable"
-    )
-
-    # Field properties
-    age: Mapped[Optional[float]] = mapped_column(
-        comment="Age of the field in years", info={"units": "years"}
-    )
-    depth: Mapped[Optional[float]] = mapped_column(
-        comment="Depth of the field in feet", info={"units": "ft"}
-    )
-    oil_prod: Mapped[Optional[float]] = mapped_column(
-        comment="Oil production volume in barrels per day", info={"units": "bbl/day"}
-    )
-    num_prod_wells: Mapped[Optional[int]] = mapped_column(
-        comment="Number of producing wells"
-    )
-    num_water_inj_wells: Mapped[Optional[int]] = mapped_column(
-        comment="Number of water injecting wells"
-    )
-    well_diam: Mapped[Optional[float]] = mapped_column(
-        comment="Production tubing diameter in inches", info={"units": "inch"}
-    )
-    prod_index: Mapped[Optional[float]] = mapped_column(
-        comment="Productivity index in bbl_oil/(psi*day)",
-        info={"units": "bbl_oil/(psi*day)"},
-    )
-    res_press: Mapped[Optional[float]] = mapped_column(
-        comment="Reservoir pressure in psi", info={"units": "psi"}
-    )
-    res_temp: Mapped[Optional[float]] = mapped_column(
-        comment="Reservoir temperature in degrees Fahrenheit", info={"units": "degF"}
-    )
-    offshore: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether the field is offshore"
-    )
-
-    # Oil and gas properties
-    api: Mapped[Optional[float]] = mapped_column(
-        comment="API gravity of oil at standard pressure and temperature"
-    )
-    gas_comp_n2: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of N2 in the gas composition"
-    )
-    gas_comp_co2: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of CO2 in the gas composition"
-    )
-    gas_comp_c1: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of C1 (methane) in the gas composition"
-    )
-    gas_comp_c2: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of C2 (ethane) in the gas composition"
-    )
-    gas_comp_c3: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of C3 (propane) in the gas composition"
-    )
-    gas_comp_c4: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of C4+ (butane+) in the gas composition"
-    )
-    gas_comp_h2s: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of H2S in the gas composition"
-    )
-
-    # Ratios
-    gor: Mapped[Optional[float]] = mapped_column(
-        comment="Gas-to-oil ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
-    )
-    wor: Mapped[Optional[float]] = mapped_column(
-        comment="Water-to-oil ratio in bbl_water/bbl_oil",
-        info={"units": "bbl_water/bbl_oil"},
-    )
-    wir: Mapped[Optional[float]] = mapped_column(
-        comment="Water injection ratio in bbl_water/bbl_oil",
-        info={"units": "bbl_water/bbl_oil"},
-    )
-    glir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas lifting injection ratio in scf/bbl_liquid",
-        info={"units": "scf/bbl_liquid"},
-    )
-    gfir: Mapped[Optional[float]] = mapped_column(
-        comment="Gas flooding injection ratio in scf/bbl_oil",
-        info={"units": "scf/bbl_oil"},
-    )
-    flood_gas_type: Mapped[Optional[FloodGasType]] = mapped_column(
-        comment="Type of gas used for flooding"
-    )
-    frac_co2_breakthrough: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of CO2 breaking through to producers"
-    )
-    co2_source: Mapped[Optional[CO2SourceType]] = mapped_column(
-        comment="Source of makeup CO2"
-    )
-    perc_sequestration_credit: Mapped[Optional[float]] = mapped_column(
-        comment="Percentage of sequestration credit assigned to the oilfield"
-    )
-    sor: Mapped[Optional[float]] = mapped_column(
-        comment="Steam-to-oil ratio in bbl_steam/bbl_oil",
-        info={"units": "bbl_steam/bbl_oil"},
-    )
-
-    # Fractions and processing
-    fraction_elec_onsite: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of required fossil electricity generated onsite"
-    )
-    fraction_remaining_gas_inj: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of remaining natural gas reinjected"
-    )
-    fraction_water_reinjected: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of produced water reinjected"
-    )
-    fraction_steam_cogen: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of steam generation via cogeneration"
-    )
-    fraction_steam_solar: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of steam generation via solar thermal"
-    )
-    heater_treater: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether a heater/treater is used"
-    )
-    stabilizer_column: Mapped[Optional[bool]] = mapped_column(
-        comment="Whether a stabilizer column is used"
-    )
-    upgrader_type: Mapped[Optional[UpgraderType]] = mapped_column(
-        comment="Type of upgrader used"
-    )
-    gas_processing_path: Mapped[Optional[GasProcessingPath]] = mapped_column(
-        comment="Associated gas processing path"
-    )
-    for_value: Mapped[Optional[float]] = mapped_column(
-        comment="Flaring-to-oil ratio in scf/bbl_oil", info={"units": "scf/bbl_oil"}
-    )
-    frac_venting: Mapped[Optional[float]] = mapped_column(
-        comment="Purposeful venting fraction (post-flare gas fraction vented)"
-    )
-    fraction_diluent: Mapped[Optional[float]] = mapped_column(
-        comment="Volume fraction of diluent"
-    )
-
-    # Land use impact
-    ecosystem_richness: Mapped[Optional[EcosystemRichness]] = mapped_column(
-        comment="Ecosystem carbon richness category"
-    )
-    field_development_intensity: Mapped[
-        Optional[FieldDevelopmentIntensity]
-    ] = mapped_column(comment="Field development intensity category")
-
-    # Transportation
-    frac_transport_tanker: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of product transported by ocean tanker"
-    )
-    frac_transport_barge: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of product transported by barge"
-    )
-    frac_transport_pipeline: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of product transported by pipeline"
-    )
-    frac_transport_rail: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of product transported by rail"
-    )
-    frac_transport_truck: Mapped[Optional[float]] = mapped_column(
-        comment="Fraction of product transported by truck"
-    )
-    transport_dist_tanker: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by ocean tanker in miles",
-        info={"units": "miles"},
-    )
-    transport_dist_barge: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by barge in miles", info={"units": "miles"}
-    )
-    transport_dist_pipeline: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by pipeline in miles", info={"units": "miles"}
-    )
-    transport_dist_rail: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by rail in miles", info={"units": "miles"}
-    )
-    transport_dist_truck: Mapped[Optional[float]] = mapped_column(
-        comment="Transportation distance by truck in miles", info={"units": "miles"}
-    )
-    ocean_tanker_size: Mapped[Optional[float]] = mapped_column(
-        comment="Ocean tanker size in tonnes", info={"units": "tonne"}
-    )
-    small_sources_emissions: Mapped[Optional[float]] = mapped_column(
-        comment="Small sources emissions", info={"units": "g/MJ"}
     )
 
     # Any additional attributes
     additional_attributes: Mapped[Optional[dict]] = mapped_column(
         JSON, comment="Additional attributes not explicitly defined in the schema"
     )
-    
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
@@ -345,6 +136,7 @@ class PyxisFieldMeta(Base):
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"
     )
+    pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(back_populates="")
 
     @classmethod
     def get_pyxis_field_meta_attributes(cls) -> List[str]:
