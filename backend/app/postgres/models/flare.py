@@ -68,10 +68,5 @@ class Flare(Base):
         server_default=func.now(), onupdate=func.now()
     )
 
-    # Relationships
-    pyxis_field_metas: Mapped[list["PyxisFieldMeta"]] = relationship(
-        back_populates="flares"
-    )
-
     def __repr__(self):
         return f"<Flare(flare_id='{self.flare_id}', original_id='{self.original_id}', volume={self.volume}, valid_from={self.valid_from}, valid_to={self.valid_to})>"
