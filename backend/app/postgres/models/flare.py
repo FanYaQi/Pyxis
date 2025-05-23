@@ -23,13 +23,13 @@ class Flare(Base):
 
     __tablename__ = "flare"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
     flare_id: Mapped[str] = mapped_column(
         String,
         unique=True,
         index=True,
         default=lambda: str(uuid.uuid4()),
         comment="Pyxis-generated unique flare identifier",
+        primary_key=True,
     )
     original_id: Mapped[str] = mapped_column(
         String, index=True, comment="Original flare ID from data source"
@@ -69,8 +69,8 @@ class Flare(Base):
     )
 
     # Relationships
-    pyxis_field_matches: Mapped[list["PyxisFieldMeta"]] = relationship(
-        back_populates="flare"
+    pyxis_field_metas: Mapped[list["PyxisFieldMeta"]] = relationship(
+        back_populates="flares"
     )
 
     def __repr__(self):
