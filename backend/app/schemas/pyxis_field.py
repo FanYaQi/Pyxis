@@ -40,9 +40,6 @@ class PyxisFieldMetaBase(BaseModel):
     geometry: Optional[WKBElement] = Field(
         None, description="Geometry of the field", exclude=True
     )
-    flare_id: Optional[int] = Field(
-        ..., description="Reference to the matched flare ID"
-    )
 
     # Additional attributes
     additional_attributes: Optional[Dict[str, Any]] = Field(
@@ -55,27 +52,6 @@ class PyxisFieldMetaBase(BaseModel):
             return to_shape(geometry).wkt
         return None
 
-    # Validators for fraction fields to ensure they're between 0 and 1
-    @field_validator(
-        "fraction_elec_onsite",
-        "fraction_remaining_gas_inj",
-        "fraction_water_reinjected",
-        "fraction_steam_cogen",
-        "fraction_steam_solar",
-        "frac_venting",
-        "fraction_diluent",
-        "frac_transport_tanker",
-        "frac_transport_barge",
-        "frac_transport_pipeline",
-        "frac_transport_rail",
-        "frac_transport_truck",
-    )
-    @classmethod
-    def validate_fractions(cls, v):
-        """Validate fractions to ensure they're between 0 and 1."""
-        if v is not None and (v < 0 or v > 100):
-            raise ValueError("Fraction value must be between 0 and 1")
-        return v
 
 
 class PyxisFieldMetaResponse(PyxisFieldMetaBase):

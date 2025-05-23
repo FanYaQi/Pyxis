@@ -3,6 +3,7 @@ from .data_entry import DataEntry
 from .data_source import DataSourceMeta
 from .pyxis_field import PyxisFieldMeta, PyxisFieldData
 from .user import User
+from .flare import Flare
 
 __all__ = [
     "User",

@@ -115,9 +115,6 @@ class PyxisFieldMeta(Base):
     centroid_h3_index: Mapped[Optional[str]] = mapped_column(
         index=True, comment="H3 index of the field centroid"
     )
-    flare_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("flare.id"), comment="Reference to the matched flare ID"
-    )
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
         Geometry("POLYGON", srid=4326), comment="Geometry of the field"
     )
@@ -136,7 +133,6 @@ class PyxisFieldMeta(Base):
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"
     )
-    flares: Mapped[List["Flare"]] = relationship(back_populates="pyxis_field_metas")
  
     @classmethod
     def get_pyxis_field_meta_attributes(cls) -> List[str]:
