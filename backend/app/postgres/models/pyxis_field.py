@@ -136,8 +136,8 @@ class PyxisFieldMeta(Base):
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"
     )
-    pyxis_field_meta: Mapped["PyxisFieldMeta"] = relationship(back_populates="")
-
+    flares: Mapped[List["Flare"]] = relationship(back_populates="pyxis_field_metas")
+ 
     @classmethod
     def get_pyxis_field_meta_attributes(cls) -> List[str]:
         """
