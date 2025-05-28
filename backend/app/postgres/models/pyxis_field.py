@@ -110,25 +110,12 @@ class PyxisFieldMeta(Base):
     # Basic field information
     name: Mapped[Optional[str]] = mapped_column(index=True)
     country: Mapped[Optional[str]] = mapped_column(index=True)
-    latitude: Mapped[Optional[float]] = mapped_column(comment="Latitude of the field")
-    longitude: Mapped[Optional[float]] = mapped_column(comment="Longitude of the field")
     centroid_h3_index: Mapped[Optional[str]] = mapped_column(
         index=True, comment="H3 index of the field centroid"
     )
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
         Geometry("POLYGON", srid=4326), comment="Geometry of the field"
     )
-
-    # Any additional attributes
-    additional_attributes: Mapped[Optional[dict]] = mapped_column(
-        JSON, comment="Additional attributes not explicitly defined in the schema"
-    )
-
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
-
     # Relationship with pyxis_field_data
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"

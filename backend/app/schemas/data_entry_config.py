@@ -59,7 +59,27 @@ class SpatialConfiguration(BaseModel):
         "EPSG:4326", description="Coordinate reference system of the source data"
     )
 
-
+class TemporalConfiguration(BaseModel):  # Changed from EffectiveDateConfiguration
+    """Configuration for extracting temporal information from data"""  # Updated description
+    
+    enabled: bool = Field(
+        False, description="Whether to extract temporal information from data"  # Updated description
+    )
+    effective_start_date_field: Optional[str] = Field(
+        None, description="Name of the field containing effective start date"
+    )
+    effective_end_date_field: Optional[str] = Field(
+        None, description="Name of the field containing effective end date"
+    )
+    date_format: Optional[str] = Field(
+        None, description="Date format string (e.g., '%Y-%m-%d', '%Y-%m-%d %H:%M:%S')"
+    )
+    default_start_date: Optional[datetime] = Field(
+        None, description="Default start date if not found in data"
+    )
+    default_end_date: Optional[datetime] = Field(
+        None, description="Default end date if not found in data"
+    )
 class Csv(BaseModel):
     delimiter: str = Field(",", description="Field delimiter character")
     encoding: str = Field("utf-8", description="Character encoding of the file")
@@ -101,6 +121,9 @@ class DataEntryConfiguration(BaseModel):
     data_metadata: DataMetadata = Field(description="Information about the data source")
     spatial_configuration: Optional[SpatialConfiguration] = Field(
         None, description="Configuration for spatial data processing"
+    )
+    temporal_configuration: Optional[TemporalConfiguration] = Field(  # Changed field name
+        None, description="Configuration for extracting temporal information from data"  # Updated description
     )
     file_specific: Optional[FileSpecific] = Field(
         default=None, description="File format-specific configuration"

@@ -45,15 +45,6 @@ class DataEntryUploadForm(BaseModel):
     additional_metadata: Optional[str] = Field(
         None, description="Additional metadata(json format)"
     )
-    valid_from: Optional[date] = Field(
-        None,
-        description="Start date when this data entry becomes valid (NULL means no start limit)",
-    )
-    valid_to: Optional[date] = Field(
-        None,
-        description="End date when this data entry stops being valid (NULL means no end limit)",
-    )
-
     model_config = ConfigDict(extra="forbid")
 
 
@@ -81,8 +72,6 @@ async def upload_data_entry(
     - source_id: ID of the data source
     - granularity: Level of data granularity (field, well, etc.)
     - alias: (Optional) Human-readable name for the data entry
-    - valid_from: (Optional) Start date when this data entry becomes valid (NULL means no start limit)
-    - valid_to: (Optional) End date when this data entry stops being valid (NULL means no end limit)
     - additional_metadata: (Optional) JSON object with additional metadata
     - data_file: The data file (CSV, etc.)
     - config_file: JSON configuration file for mapping data
@@ -96,17 +85,6 @@ async def upload_data_entry(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid JSON format for additional metadata: {str(e)}",
             ) from e
-
-    # Validate date range if both dates are provided
-    if (
-        form_data.valid_from
-        and form_data.valid_to
-        and form_data.valid_from > form_data.valid_to
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Valid from date must be before valid to date",
-        )
 
     # Check if source exists and user has access
     data_source = (
@@ -163,8 +141,6 @@ async def upload_data_entry(
             data_file=data_file,
             config_file=config_file,
             additional_metadata=additional_metadata,
-            valid_from=form_data.valid_from,
-            valid_to=form_data.valid_to,
         )
 
         return DataEntryUploadResponse(

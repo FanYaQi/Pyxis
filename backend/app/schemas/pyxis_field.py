@@ -40,12 +40,6 @@ class PyxisFieldMetaBase(BaseModel):
     geometry: Optional[WKBElement] = Field(
         None, description="Geometry of the field", exclude=True
     )
-
-    # Additional attributes
-    additional_attributes: Optional[Dict[str, Any]] = Field(
-        None, description="Additional attributes not explicitly defined in the schema"
-    )
-
     @field_serializer("geometry")
     def serialize_geometry(self, geometry: WKBElement):
         if geometry:
@@ -56,11 +50,8 @@ class PyxisFieldMetaBase(BaseModel):
 
 class PyxisFieldMetaResponse(PyxisFieldMetaBase):
     """Schema for returning a PyxisFieldMeta"""
-
     id: int
     geometry_wkt: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
 
 # PyxisFieldData schemas
