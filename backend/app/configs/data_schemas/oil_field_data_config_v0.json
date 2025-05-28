@@ -99,7 +99,7 @@
       },
       "temporal_configuration": {
         "type": "object",
-        "description": "Configuration for extracting effective dates from data",
+        "description": "Configuration for extracting valid dates from data",
         "required": ["enabled"],
         "properties": {
           "enabled": {
@@ -107,24 +107,24 @@
             "description": "Whether to extract temporal information from data",
             "default": false
           },
-          "effective_start_date_field": {
+          "valid_from_field": {
             "type": "string",
-            "description": "Name of the field containing effective start date"
+            "description": "Name of the field containing valid start date"
           },
-          "effective_end_date_field": {
+          "valid_to_field": {
             "type": "string",
-            "description": "Name of the field containing effective end date"
+            "description": "Name of the field containing valid end date"
           },
           "date_format": {
             "type": "string",
             "description": "Date format string (e.g., '%Y-%m-%d', '%Y-%m-%d %H:%M:%S')"
           },
-          "default_start_date": {
+          "default_from": {
             "type": "string",
             "format": "date-time",
             "description": "Default start date if not found in data (ISO format)"
           },
-          "default_end_date": {
+          "default_to": {
             "type": "string",
             "format": "date-time",
             "description": "Default end date if not found in data (ISO format)"

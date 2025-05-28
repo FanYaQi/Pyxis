@@ -148,7 +148,7 @@ class PyxisFieldData(Base):
     # TODO: Partitioning strategy - for time-based queries
     # __table_args__ = (
     #     # Partition by year to optimize time-based queries
-    #     {"postgresql_partition_by": "RANGE (effective_start_date)"},
+    #     {"postgresql_partition_by": "RANGE (valid_from)"},
     # )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -158,10 +158,10 @@ class PyxisFieldData(Base):
     data_entry_id: Mapped[int] = mapped_column(
         ForeignKey("data_entry.id"), comment="Reference to the data entry ID"
     )
-    effective_start_date: Mapped[Optional[datetime]] = mapped_column(
-        index=True, comment="Start date when these attributes became effective"
+    valid_from: Mapped[Optional[datetime]] = mapped_column(
+        index=True, comment="Start date when these attributes became valid"
     )
-    effective_end_date: Mapped[Optional[datetime]] = mapped_column(
+    valid_to: Mapped[Optional[datetime]] = mapped_column(
         index=True, comment="End date when these attributes were superseded"
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

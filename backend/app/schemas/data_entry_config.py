@@ -59,25 +59,25 @@ class SpatialConfiguration(BaseModel):
         "EPSG:4326", description="Coordinate reference system of the source data"
     )
 
-class TemporalConfiguration(BaseModel):  # Changed from EffectiveDateConfiguration
+class TemporalConfiguration(BaseModel):  # Changed from validDateConfiguration
     """Configuration for extracting temporal information from data"""  # Updated description
     
     enabled: bool = Field(
         False, description="Whether to extract temporal information from data"  # Updated description
     )
-    effective_start_date_field: Optional[str] = Field(
-        None, description="Name of the field containing effective start date"
+    valid_from_field: Optional[str] = Field(
+        None, description="Name of the field containing valid start date"
     )
-    effective_end_date_field: Optional[str] = Field(
-        None, description="Name of the field containing effective end date"
+    valid_to_field: Optional[str] = Field(
+        None, description="Name of the field containing valid end date"
     )
     date_format: Optional[str] = Field(
         None, description="Date format string (e.g., '%Y-%m-%d', '%Y-%m-%d %H:%M:%S')"
     )
-    default_start_date: Optional[datetime] = Field(
+    default_from: Optional[datetime] = Field(
         None, description="Default start date if not found in data"
     )
-    default_end_date: Optional[datetime] = Field(
+    default_to: Optional[datetime] = Field(
         None, description="Default end date if not found in data"
     )
 class Csv(BaseModel):
