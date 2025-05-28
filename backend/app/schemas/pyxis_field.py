@@ -64,10 +64,10 @@ class PyxisFieldDataBase(BaseModel):
         ..., description="Reference to the Pyxis field meta ID"
     )
     data_entry_id: int = Field(..., description="Reference to the data entry ID")
-    effective_start_date: datetime = Field(
-        ..., description="Start date when these attributes became effective"
+    valid_from: datetime = Field(
+        ..., description="Start date when these attributes became valid"
     )
-    effective_end_date: Optional[datetime] = Field(
+    valid_to: Optional[datetime] = Field(
         None, description="End date when these attributes were superseded"
     )
 
