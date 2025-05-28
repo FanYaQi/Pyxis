@@ -11,6 +11,7 @@ from .routes import (
     data_entries,
     database,
     fields_data,
+    flare,
     private,
 )
 
@@ -23,6 +24,7 @@ router.include_router(login.router)
 router.include_router(data_sources.router)
 router.include_router(data_entries.router)
 router.include_router(fields_data.router)
+router.include_router(flare.router)
 
 
 if settings.ENVIRONMENT == "local":
