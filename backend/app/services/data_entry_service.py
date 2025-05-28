@@ -56,8 +56,6 @@ async def validate_data_entry(
     file_extension: FileExtension,
     data_file: UploadFile,
     config_file: UploadFile,
-    valid_from: Optional[date] = None,
-    valid_to: Optional[date] = None,
     additional_metadata: Optional[Dict[str, Any]] = None,
 ) -> DataEntry:
     """
@@ -73,8 +71,6 @@ async def validate_data_entry(
         file_extension: Type of data file
         data_file: The uploaded data file
         config_file: The uploaded config file
-        valid_from: Optional start date for validity period (NULL means no start limit)
-        valid_to: Optional end date for validity period (NULL means no end limit)
         additional_metadata: Additional metadata to store
 
     Returns:
@@ -128,8 +124,6 @@ async def validate_data_entry(
         config_file_md5=config_md5,
         status=ProcessingStatus.PENDING,  # Set to PENDING by default
         additional_metadata=additional_metadata,
-        valid_from=valid_from,
-        valid_to=valid_to,
     )
 
     # Save to database
@@ -606,6 +600,7 @@ def extract_field_attributes(
                         row[source_attr], source_attr_info, target_attr_info
                     )
                 except (ValueError, KeyError) as e:
+                    # TODO: interrupt here, do not suppress exception
                     logger.warning(
                         f"Error converting {source_attr} to {target_attr}: {str(e)}"
                     )
@@ -659,7 +654,12 @@ def get_or_create_field_meta(
 
     # Create new field meta if no match found
     logger.info(f"Creating new field '{field_name}' (no match found)")
-    new_field = PyxisFieldMeta(pyxis_field_code=str(uuid.uuid4()), **field_attrs)
+    new_field = PyxisFieldMeta(pyxis_field_code=str(uuid.uuid4()),
+                            name=field_attrs['name'],
+                            country=field_attrs['country'],
+                            centroid_h3_index = field_attrs['centroid_h3_index'],
+                            geometry = field_attrs['geometry']
+                            )
     db.add(new_field)
     db.flush()  # Get ID assigned by database
     return new_field, True
@@ -686,17 +686,6 @@ def create_field_data(
         "pyxis_field_meta_id": field_meta.id,
         "data_entry_id": data_entry.id,
     }
-
-    # Set effective dates based on data entry validity dates
-    if data_entry.valid_from:
-        data_dict["effective_start_date"] = datetime.combine(
-            data_entry.valid_from, datetime.min.time()
-        )
-
-    if data_entry.valid_to:
-        data_dict["effective_end_date"] = datetime.combine(
-            data_entry.valid_to, datetime.max.time()
-        )
 
     # Add all mapped field attributes
     data_dict.update(field_attrs)

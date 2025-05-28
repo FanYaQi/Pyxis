@@ -38,7 +38,5 @@ class DataEntryInfo(BaseModel):
     additional_metadata: Optional[Dict[str, Any]] = Field(
         None, description="Additional metadata for the entry"
     )
-    valid_from: Optional[date] = None
-    valid_to: Optional[date] = None
     created_at: datetime
     updated_at: datetime

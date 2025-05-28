@@ -97,6 +97,40 @@
           }
         }
       },
+      "temporal_configuration": {
+        "type": "object",
+        "description": "Configuration for extracting effective dates from data",
+        "required": ["enabled"],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether to extract temporal information from data",
+            "default": false
+          },
+          "effective_start_date_field": {
+            "type": "string",
+            "description": "Name of the field containing effective start date"
+          },
+          "effective_end_date_field": {
+            "type": "string",
+            "description": "Name of the field containing effective end date"
+          },
+          "date_format": {
+            "type": "string",
+            "description": "Date format string (e.g., '%Y-%m-%d', '%Y-%m-%d %H:%M:%S')"
+          },
+          "default_start_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Default start date if not found in data (ISO format)"
+          },
+          "default_end_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Default end date if not found in data (ISO format)"
+          }
+        }
+      },
       "file_specific": {
         "type": "object",
         "description": "File format-specific configuration",
