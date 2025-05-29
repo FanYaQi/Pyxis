@@ -16,6 +16,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
+    UniqueConstraint,
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -95,7 +96,43 @@ class FieldDevelopmentIntensity(str, enum.Enum):
     MEDIUM = "Med"
     HIGH = "High"
 
+class PyxisFieldH3(Base):
+    """
+    Model for storing H3 indices that cover a PyxisFieldMeta geometry.
+    
+    Each row represents one H3 cell that intersects with a field's geometry.
+    Multiple H3 cells can belong to the same field for complex geometries.
+    """
 
+    __tablename__ = "pyxis_field_h3"
+    __table_args__ = (
+        UniqueConstraint(
+            "pyxis_field_meta_id", "h3_index", 
+            name="uq_field_h3_index"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pyxis_field_meta_id: Mapped[int] = mapped_column(
+        ForeignKey("pyxis_field_meta.id", ondelete="CASCADE"),
+        index=True,
+        comment="Reference to the PyxisFieldMeta ID"
+    )
+    h3_index: Mapped[str] = mapped_column(
+        String(15),
+        index=True,
+        comment="H3 index that intersects with the field geometry"
+    )
+
+    # Relationship back to field meta
+    field_meta: Mapped["PyxisFieldMeta"] = relationship(
+        "PyxisFieldMeta", 
+        back_populates="h3_indices"
+    )
+
+    def __repr__(self):
+        return f"<PyxisFieldH3(field_id={self.pyxis_field_meta_id}, h3_index='{self.h3_index}')>"
+    
 class PyxisFieldMeta(Base):
     """
     Metadata for a Pyxis field. Used to determine whether two fields are the same.
@@ -119,6 +156,12 @@ class PyxisFieldMeta(Base):
     # Relationship with pyxis_field_data
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
         back_populates="pyxis_field_meta"
+    )
+    # Relationship with H3 indices
+    h3_indices: Mapped[List["PyxisFieldH3"]] = relationship(
+        "PyxisFieldH3",
+        back_populates="field_meta",
+        cascade="all, delete-orphan"
     )
  
     @classmethod

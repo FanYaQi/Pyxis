@@ -3,6 +3,12 @@
     "functional_unit": {
       "method": "most_frequent"
     },
+    "name": {
+      "method": "most_frequent"
+    },
+    "country": {
+      "method": "most_frequent"
+    },
     "downhole_pump": {
       "method": "most_frequent"
     },
@@ -28,7 +34,8 @@
       "method": "most_frequent"
     },
     "age": {
-      "method": "custom",
+      "method": "average",
+      "round": "int",
       "function": "avg_age"
     },
     "depth": {
@@ -85,10 +92,12 @@
       "method": "average"
     },
     "gor": {
-      "method": "average"
+      "method": "average",
+      "function": "volume_weighted"
     },
     "wor": {
-      "method": "average"
+      "method": "average",
+      "function": "volume_weighted"
     },
     "wir": {
       "method": "average"
@@ -112,7 +121,8 @@
       "method": "average"
     },
     "sor": {
-      "method": "average"
+      "method": "average",
+      "function": "volume_weighted"
     },
     "fraction_elec_onsite": {
       "method": "average"
@@ -142,7 +152,8 @@
       "method": "most_frequent"
     },
     "for_value": {
-      "method": "average"
+      "method": "average",
+      "function": "volume_weighted"
     },
     "frac_venting": {
       "method": "average"
@@ -191,10 +202,6 @@
     },
     "small_sources_emissions": {
       "method": "average"
-    },
-    "additional_attributes": {
-      "method": "custom",
-      "function": "merge_dictionaries"
     }
   }
 }
