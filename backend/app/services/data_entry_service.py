@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from geoalchemy2.shape import to_shape
 
-from app.postgres.models.pyxis_field import PyxisFieldMeta, PyxisFieldData, PyxisFieldH3
+from app.postgres.models.pyxis_field import PyxisFieldMeta, PyxisFieldData
 from app.postgres.models.data_entry import (
     DataEntry,
     ProcessingStatus,
@@ -215,66 +215,6 @@ async def trigger_data_processing(
         "status": ProcessingStatus.PROCESSING,
     }
 
-
-def update_field_h3_indices(db: Session, field_meta, resolution: int = 9):
-    """
-    Update H3 indices for a field when its geometry changes.
-    """
-    logger.info(f"Updating H3 indices for field {field_meta.id}")
-    
-    # Check if geometry exists
-    if not field_meta.geometry:
-        return
-    
-    try:
-        # Convert to Shapely geometry
-        shapely_geom = to_shape(field_meta.geometry)
-        geom_type = type(shapely_geom).__name__
-        
-        # Collect all H3 indices from all polygons
-        all_h3_indices = set()
-        
-        if geom_type == 'Polygon':
-            geojson = {
-                "type": "Polygon",
-                "coordinates": [list(shapely_geom.exterior.coords)]
-            }
-            h3_indices = h3.polyfill(geojson, resolution)
-            all_h3_indices.update(h3_indices)
-            
-        elif geom_type == 'MultiPolygon':
-            # Process each polygon in the MultiPolygon
-            for polygon in shapely_geom.geoms:
-                geojson = {
-                    "type": "Polygon",
-                    "coordinates": [list(polygon.exterior.coords)]
-                }
-                h3_indices = h3.polyfill(geojson, resolution)
-                all_h3_indices.update(h3_indices)
-        else:
-            logger.error(f"Field {field_meta.id} unsupported geometry type: {geom_type}")
-            return
-        
-        if not all_h3_indices:
-            return
-        
-        # Update database: remove old indices and add new ones
-        db.query(PyxisFieldH3).filter(
-            PyxisFieldH3.pyxis_field_meta_id == field_meta.id
-        ).delete()
-        
-        # Bulk insert new H3 indices
-        h3_records = [
-            PyxisFieldH3(pyxis_field_meta_id=field_meta.id, h3_index=h3_index)
-            for h3_index in all_h3_indices
-        ]
-        db.add_all(h3_records)
-        logger.info(f"Added {len(h3_records)} H3 indices for field {field_meta.id}")
-        
-    except Exception as e:
-        logger.error(f"Failed to update H3 indices for field {field_meta.id}: {str(e)}")
-
-
 def calculate_match_score(
     name1: Optional[str],
     name2: Optional[str],
@@ -468,7 +408,7 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
     # Flush to assign IDs to field data
     db.flush()
 
-    # Now merge and update H3 indices for all affected field metas
+    # Now merge for all affected field metas
     for field_meta_id in field_metas_to_merge:
         update_pyxis_field_meta_merge(field_meta_id, db)
 
@@ -537,8 +477,6 @@ def get_or_create_field_meta(
 ) -> Tuple[PyxisFieldMeta, bool]:
     """
     Find or create a PyxisFieldMeta record based on field attributes.
-    Does NOT update H3 indices - that's done later in the merge step.
-
     Args:
         field_attrs: Dictionary of field attributes
         db: Database session
@@ -581,7 +519,6 @@ def update_pyxis_field_meta_merge(field_meta_id: int, db: Session) -> None:
     """
     Update PyxisFieldMeta with merged name, country, and geometry from all associated field data.
     Calculate centroid H3 from merged geometry.
-    This is where H3 indices are updated - only once per field during merge.
 
     Args:
         field_meta_id: ID of the PyxisFieldMeta to update
@@ -610,22 +547,13 @@ def update_pyxis_field_meta_merge(field_meta_id: int, db: Session) -> None:
     )
 
     # Update field meta with merged values
-    updates_made = False
     for attr, value in merged_values.items():
         if hasattr(field_meta, attr):
             current_value = getattr(field_meta, attr)
             # Don't overwrite with None and only update if value changed
             if value is not None and value != current_value:
                 setattr(field_meta, attr, value)
-                updates_made = True
 
-    # Update H3 indices if anything was updated (especially geometry)
-    if updates_made:
-        logger.info(f"Merging data for field {field_meta_id}")
-        field_meta.updated_at = datetime.now()
-        db.add(field_meta)
-        # This is the ONLY place where H3 indices are updated
-        update_field_h3_indices(db, field_meta)
 
 
 def create_field_data(
@@ -853,65 +781,6 @@ async def trigger_data_processing(
     }
 
 
-def update_field_h3_indices(db: Session, field_meta, resolution: int = 9):
-    """
-    Update H3 indices for a field when its geometry changes.
-    """
-    logger.info(f"Updating H3 indices for field {field_meta.id}")
-    
-    # Check if geometry exists and is the correct type
-    if not field_meta.geometry:
-        return
-    
-    try:
-        # Convert to Shapely geometry
-        shapely_geom = to_shape(field_meta.geometry)
-        geom_type = type(shapely_geom).__name__
-        
-        # Collect all H3 indices from all polygons
-        all_h3_indices = set()
-        
-        if geom_type == 'Polygon':
-            geojson = {
-                "type": "Polygon",
-                "coordinates": [list(shapely_geom.exterior.coords)]
-            }
-            h3_indices = h3.polyfill(geojson, resolution)
-            all_h3_indices.update(h3_indices)
-            
-        elif geom_type == 'MultiPolygon':
-            # Process each polygon in the MultiPolygon
-            for polygon in shapely_geom.geoms:
-                geojson = {
-                    "type": "Polygon",
-                    "coordinates": [list(polygon.exterior.coords)]
-                }
-                h3_indices = h3.polyfill(geojson, resolution)
-                all_h3_indices.update(h3_indices)
-        else:
-            logger.error(f"Field {field_meta.id} unsupported geometry type: {geom_type}")
-            return
-        
-        if not all_h3_indices:
-            return
-        
-        # Update database: remove old indices and add new ones
-        db.query(PyxisFieldH3).filter(
-            PyxisFieldH3.pyxis_field_meta_id == field_meta.id
-        ).delete()
-        
-        # Bulk insert new H3 indices
-        h3_records = [
-            PyxisFieldH3(pyxis_field_meta_id=field_meta.id, h3_index=h3_index)
-            for h3_index in all_h3_indices
-        ]
-        db.add_all(h3_records)
-        logger.info(f"Added {len(h3_records)} H3 indices for field {field_meta.id}")
-        
-    except Exception as e:
-        logger.error(f"Failed to update H3 indices for field {field_meta.id}: {str(e)}")
-
-
 def calculate_match_score(
     name1: Optional[str],
     name2: Optional[str],
@@ -1106,7 +975,7 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
     # Flush to assign IDs to field data
     db.flush()
 
-    # Now merge and update H3 indices for all affected field metas
+    # Now merge for all affected field metas
     for field_meta_id, field_attrs in field_metas_to_merge.items():
         update_pyxis_field_meta_merge(field_meta_id, field_attrs, db)
 
@@ -1175,7 +1044,7 @@ def get_or_create_field_meta(
 ) -> Tuple[PyxisFieldMeta, bool]:
     """
     Find or create a PyxisFieldMeta record based on field attributes.
-    Does NOT update H3 indices - that's done later in the merge step.
+
 
     Args:
         field_attrs: Dictionary of field attributes
@@ -1220,7 +1089,6 @@ def update_pyxis_field_meta_merge(
 ) -> None:
     """
     Update PyxisFieldMeta with merged name, country, and geometry from all associated field data.
-    This is where H3 indices are updated - only once per field during merge.
 
     Args:
         field_meta_id: ID of the PyxisFieldMeta to update
@@ -1249,24 +1117,13 @@ def update_pyxis_field_meta_merge(
         ['name', 'country', 'geometry']
     )
 
-    # Update field meta with merged values
-    updates_made = False
+    # Update field meta with merged values 
     for attr, value in merged_values.items():
         if hasattr(field_meta, attr):
             current_value = getattr(field_meta, attr)
             # Don't overwrite with None and only update if value changed
             if value is not None and value != current_value:
                 setattr(field_meta, attr, value)
-                updates_made = True
-
-    # Update H3 indices if anything was updated (especially geometry)
-    if updates_made:
-        logger.info(f"Merging data for field {field_meta_id}")
-        field_meta.updated_at = datetime.now()
-        db.add(field_meta)
-        # This is the ONLY place where H3 indices are updated
-        update_field_h3_indices(db, field_meta)
-
 
 def create_field_data(
     field_meta: PyxisFieldMeta,
