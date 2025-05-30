@@ -42,7 +42,7 @@ class Flare(Base):
         Geometry("POINT", srid=4326), comment="Point geometry of flare"
     )
     h3_index: Mapped[str] = mapped_column(
-        String(15), index=True, comment="H3 index at resolution 10"
+        String(15), index=True, comment="H3 index at resolution 9"
     )
 
     # Volume data

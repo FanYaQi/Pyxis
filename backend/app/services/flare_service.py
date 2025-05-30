@@ -20,7 +20,7 @@ from app.schemas.flare import FlareCreate, FlareFilter
 
 logger = logging.getLogger(__name__)
 
-
+flare_res = 9
 class FlareService:
     """Service for handling flare data operations"""
 
@@ -116,7 +116,7 @@ class FlareService:
                     valid_from, valid_to = FlareService.get_month_period(month_date)
                     
                     # Calculate H3 index
-                    h3_index = h3.geo_to_h3(latitude, longitude, resolution=9)
+                    h3_index = h3.geo_to_h3(latitude, longitude, resolution=flare_res)
                     
                     # Create geometry (PostGIS POINT)
                     geometry = WKTElement(f'POINT({longitude} {latitude})', srid=4326)
