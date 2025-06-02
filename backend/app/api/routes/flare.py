@@ -1,6 +1,7 @@
 """Flare data API routes."""
 
 import math
+import os
 from typing import List, Optional
 from datetime import date
 
@@ -13,6 +14,7 @@ from fastapi import (
     File,
     Query,
 )
+from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentUser, DBSessionDep
 from app.schemas.flare import (
@@ -20,8 +22,11 @@ from app.schemas.flare import (
     FlareListResponse,
     FlareUploadResponse,
     FlareFilter,
+    FlareAssignmentRequest,
+    FlareAssignmentResponse,
 )
 from app.services.flare_service import FlareService
+from app.configs.settings import settings
 
 
 router = APIRouter(prefix="/flares", tags=["flares"])
@@ -244,3 +249,148 @@ def get_flare_statistics(
             "latest_date": stats.latest_date,
         }
     }
+
+
+@router.post("/assign-to-fields", response_model=FlareAssignmentResponse)
+def assign_flares_to_fields(
+    request: FlareAssignmentRequest,
+    current_user: CurrentUser,
+    db: DBSessionDep,
+):
+    """
+    Assign flares to oil/gas fields based on spatial and temporal criteria.
+    
+    The assignment process:
+    1. Filters flares by H3 k-ring proximity and time range
+    2. For each field, attempts exact geometry matching first
+    3. If no exact matches, tries buffer zone matching (5km default)
+    4. Prevents double assignment of flares
+    5. Generates detailed CSV with assignment results
+    
+    **Input Options:**
+    - **field_ids**: Process specific fields by ID
+    - **country**: Process all fields in a country
+    - **Time range**: Required for all assignments
+    
+    **Output:**
+    - Assignment statistics
+    - CSV download URL with detailed results
+    
+    **Example Requests:**
+    ```json
+    // Assign to specific fields
+    {
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31", 
+        "field_ids": [1, 2, 3],
+        "config": {
+            "proximity_distance_km": 100.0,
+            "buffer_distance_km": 5.0
+        }
+    }
+    
+    // Assign to all fields in a country
+    {
+        "start_date": "2024-01-01",
+        "end_date": "2024-12-31",
+        "country": "Brazil"
+    }
+    ```
+    """
+    try:
+        # Call the service method
+        statistics, csv_file_path = FlareService.assign_flares_to_fields(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            db=db,
+            field_ids=request.field_ids,
+            country=request.country,
+            proximity_distance_km=request.config.proximity_distance_km,
+            buffer_distance_km=request.config.buffer_distance_km
+        )
+        
+        # Generate download URL and filename
+        csv_filename = os.path.basename(csv_file_path)
+        download_url = f"{settings.API_V1_STR}/flares/download/{csv_filename}"
+        
+        return FlareAssignmentResponse(
+            statistics=statistics,
+            csv_download_url=download_url,
+            csv_filename=csv_filename
+        )
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing flare assignment: {str(e)}"
+        ) from e
+
+
+@router.get("/download/{filename}")
+def download_assignment_csv(
+    filename: str,
+    current_user: CurrentUser,
+):
+    """
+    Download generated assignment CSV file.
+    
+    **Security Notes:**
+    - Only downloads files from the assignments directory
+    - Validates filename to prevent path traversal
+    - Files are automatically cleaned up after a period
+    
+    **Usage:**
+    Use the CSV download URL returned from the `/assign-to-fields` endpoint.
+    """
+    # Validate filename to prevent path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename"
+        )
+    
+    # Only allow CSV files
+    if not filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only CSV files can be downloaded"
+        )
+    
+    # Check if it's an assignment file (should contain 'flare_assignment')
+    if 'flare_assignment' not in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid assignment file"
+        )
+    
+    try:
+        from app.utils.path_util import get_data_path
+        
+        file_path = get_data_path("assignments", filename)
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found or has expired"
+            )
+        
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error downloading file: {str(e)}"
+        ) from e
