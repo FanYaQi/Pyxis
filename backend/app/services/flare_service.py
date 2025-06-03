@@ -302,7 +302,6 @@ class FlareService:
         logger.info(f"Deleted {deleted_count} flare records")
         return deleted_count
 
-    # New methods for flare assignment
     @staticmethod
     def assign_flares_to_fields(
         start_date: date,
@@ -311,8 +310,9 @@ class FlareService:
         field_ids: Optional[List[int]] = None,
         country: Optional[str] = None,
         proximity_distance_km: float = 100.0,
-        buffer_distance_km: float = 5.0
-    ) -> Tuple[Dict[str, Any], str]:
+        buffer_distance_km: float = 5.0,
+        csv_output_path: Optional[str] = None  # Add this parameter
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
         """
         Assign flares to fields based on spatial and temporal criteria.
         
@@ -326,7 +326,7 @@ class FlareService:
             buffer_distance_km: Buffer distance for buffer matching
             
         Returns:
-            Tuple of (assignment_statistics, csv_file_path)
+            Tuple of (assignment_statistics, csv_file_path_or_none)
         """
         start_time = datetime.now()
         
@@ -368,8 +368,8 @@ class FlareService:
         )
         
         # Step 5: Generate CSV file
-        csv_file_path = FlareService._generate_assignment_csv(
-            field_assignments, fields, candidate_flares, start_date, end_date
+        csv_file_path = FlareService._generate_assignment_summary_csv(
+            field_assignments, fields, start_date, end_date, csv_output_path
         )
         
         processing_time = (datetime.now() - start_time).total_seconds()
@@ -576,97 +576,62 @@ class FlareService:
         }
 
     @staticmethod
-    def _generate_assignment_csv(
+    def _generate_assignment_summary_csv(
         field_assignments: Dict[int, Dict],
         fields: List[PyxisFieldMeta],
-        candidate_flares: List[Flare],
         start_date: date,
-        end_date: date
-    ) -> str:
+        end_date: date,
+        output_path: Optional[str] = None
+    ) -> Optional[str]:
         """
-        Generate CSV file with detailed assignment results.
+        Generate CSV file with aggregated assignment results per field.
         
         Args:
             field_assignments: Field assignment results
             fields: List of target fields
-            candidate_flares: List of candidate flares
             start_date: Query start date
             end_date: Query end date
+            output_path: Optional local file path to save CSV
             
         Returns:
-            Path to generated CSV file
+            File path where CSV was saved, or None if no output_path provided
         """
-        # Create flare lookup for efficiency
-        flare_lookup = {f.flare_id: f for f in candidate_flares}
+        if not output_path:
+            return None
         
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"flare_assignment_{timestamp}.csv"
-        csv_path = get_data_path("assignments", filename)
-        
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-        
-        # Write CSV
-        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = [
-                'field_id', 'field_name', 'field_country', 'field_h3_index',
-                'flare_id', 'flare_original_id', 'flare_lat', 'flare_lon', 
-                'flare_h3_index', 'flare_volume', 'flare_valid_from', 'flare_valid_to',
-                'match_type', 'query_start_date', 'query_end_date'
-            ]
+        try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            # Write assignment data
-            for field_id, assignment in field_assignments.items():
-                field = next(f for f in fields if f.id == field_id)
+            # Write CSV
+            with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = [
+                    'field_id', 'field_name', 'field_country', 
+                    'flare_sum', 'query_start_date', 'query_end_date'
+                ]
                 
-                # Write exact matches
-                for flare_id in assignment['exact_match_flare_ids']:
-                    flare = flare_lookup[flare_id]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                # Write aggregated data for each field
+                for field_id, assignment in field_assignments.items():
+                    field = next(f for f in fields if f.id == field_id)
+                    
                     writer.writerow({
                         'field_id': field.id,
-                        'field_name': field.name,
-                        'field_country': field.country,
-                        'field_h3_index': field.centroid_h3_index,
-                        'flare_id': flare.flare_id,
-                        'flare_original_id': flare.original_id,
-                        'flare_lat': flare.latitude,
-                        'flare_lon': flare.longitude,
-                        'flare_h3_index': flare.h3_index,
-                        'flare_volume': flare.volume,
-                        'flare_valid_from': flare.valid_from,
-                        'flare_valid_to': flare.valid_to,
-                        'match_type': 'exact',
+                        'field_name': field.name or '',
+                        'field_country': field.country or '',
+                        'flare_sum': assignment['total_volume'],  # Sum of exact + buffer volumes
                         'query_start_date': start_date,
                         'query_end_date': end_date
                     })
-                
-                # Write buffer matches
-                for flare_id in assignment['buffer_match_flare_ids']:
-                    flare = flare_lookup[flare_id]
-                    writer.writerow({
-                        'field_id': field.id,
-                        'field_name': field.name,
-                        'field_country': field.country,
-                        'field_h3_index': field.centroid_h3_index,
-                        'flare_id': flare.flare_id,
-                        'flare_original_id': flare.original_id,
-                        'flare_lat': flare.latitude,
-                        'flare_lon': flare.longitude,
-                        'flare_h3_index': flare.h3_index,
-                        'flare_volume': flare.volume,
-                        'flare_valid_from': flare.valid_from,
-                        'flare_valid_to': flare.valid_to,
-                        'match_type': 'buffer',
-                        'query_start_date': start_date,
-                        'query_end_date': end_date
-                    })
-        
-        logger.info(f"Generated assignment CSV: {csv_path}")
-        return csv_path
+            
+            logger.info(f"Generated assignment CSV: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"Error generating CSV file: {str(e)}")
+            raise ValueError(f"Failed to write CSV to {output_path}: {str(e)}")
 
     @staticmethod
     def _calculate_assignment_statistics(
@@ -703,96 +668,3 @@ class FlareService:
             'total_volume_assigned': total_volume_assigned,
             'unassigned_flares': len(candidate_flares) - len(assigned_flare_ids)
         }
-
-    @staticmethod
-    def _generate_assignment_csv(
-        field_assignments: Dict[int, Dict],
-        fields: List[PyxisFieldMeta],
-        candidate_flares: List[Flare],
-        start_date: date,
-        end_date: date
-    ) -> str:
-        """
-        Generate CSV file with detailed assignment results.
-        
-        Args:
-            field_assignments: Field assignment results
-            fields: List of target fields
-            candidate_flares: List of candidate flares
-            start_date: Query start date
-            end_date: Query end date
-            
-        Returns:
-            Path to generated CSV file
-        """
-        # Create flare lookup for efficiency
-        flare_lookup = {f.flare_id: f for f in candidate_flares}
-        
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"flare_assignment_{timestamp}.csv"
-        csv_path = get_data_path("assignments", filename)
-        
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-        
-        # Write CSV
-        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = [
-                'field_id', 'field_name', 'field_country', 'field_h3_index',
-                'flare_id', 'flare_original_id', 'flare_lat', 'flare_lon', 
-                'flare_h3_index', 'flare_volume', 'flare_valid_from', 'flare_valid_to',
-                'match_type', 'query_start_date', 'query_end_date'
-            ]
-            
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            # Write assignment data
-            for field_id, assignment in field_assignments.items():
-                field = next(f for f in fields if f.id == field_id)
-                
-                # Write exact matches
-                for flare_id in assignment['exact_match_flare_ids']:
-                    flare = flare_lookup[flare_id]
-                    writer.writerow({
-                        'field_id': field.id,
-                        'field_name': field.name,
-                        'field_country': field.country,
-                        'field_h3_index': field.centroid_h3_index,
-                        'flare_id': flare.flare_id,
-                        'flare_original_id': flare.original_id,
-                        'flare_lat': flare.latitude,
-                        'flare_lon': flare.longitude,
-                        'flare_h3_index': flare.h3_index,
-                        'flare_volume': flare.volume,
-                        'flare_valid_from': flare.valid_from,
-                        'flare_valid_to': flare.valid_to,
-                        'match_type': 'exact',
-                        'query_start_date': start_date,
-                        'query_end_date': end_date
-                    })
-                
-                # Write buffer matches
-                for flare_id in assignment['buffer_match_flare_ids']:
-                    flare = flare_lookup[flare_id]
-                    writer.writerow({
-                        'field_id': field.id,
-                        'field_name': field.name,
-                        'field_country': field.country,
-                        'field_h3_index': field.centroid_h3_index,
-                        'flare_id': flare.flare_id,
-                        'flare_original_id': flare.original_id,
-                        'flare_lat': flare.latitude,
-                        'flare_lon': flare.longitude,
-                        'flare_h3_index': flare.h3_index,
-                        'flare_volume': flare.volume,
-                        'flare_valid_from': flare.valid_from,
-                        'flare_valid_to': flare.valid_to,
-                        'match_type': 'buffer',
-                        'query_start_date': start_date,
-                        'query_end_date': end_date
-                    })
-        
-        logger.info(f"Generated assignment CSV: {csv_path}")
-        return csv_path

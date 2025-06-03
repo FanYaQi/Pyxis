@@ -90,18 +90,10 @@ class FlareAssignmentRequest(BaseModel):
     
     start_date: date = Field(..., description="Start date for time range filter (YYYY-MM-DD)")
     end_date: date = Field(..., description="End date for time range filter (YYYY-MM-DD)")
-    field_ids: Optional[List[int]] = Field(
-        None, 
-        description="Optional list of specific field IDs to process"
-    )
-    country: Optional[str] = Field(
-        None,
-        description="Optional country filter for fields (alternative to field_ids)"
-    )
-    config: FlareAssignmentConfig = Field(
-        default_factory=FlareAssignmentConfig,
-        description="Assignment configuration parameters"
-    )
+    field_ids: Optional[List[int]] = Field(None, description="Optional list of specific field IDs to process")
+    country: Optional[str] = Field(None, description="Optional country filter for fields")
+    config: FlareAssignmentConfig = Field(default_factory=FlareAssignmentConfig, description="Assignment configuration parameters")
+    csv_output_path: Optional[str] = Field(None, description="Local file path to save CSV results (e.g., '/home/user/results.csv')")
     
     @field_validator('end_date')
     @classmethod
@@ -145,9 +137,7 @@ class FlareAssignmentResponse(BaseModel):
     """Response schema for flare assignment"""
     
     statistics: FlareAssignmentStatistics
-    csv_download_url: str = Field(..., description="URL to download detailed CSV results")
-    csv_filename: str = Field(..., description="Name of the generated CSV file")
-
+    csv_file_path: Optional[str] = Field(None, description="Path where CSV file was saved (if csv_output_path provided)")
 
 class FieldFlareMatch(BaseModel):
     """Schema for individual field-flare match result (for detailed responses)"""

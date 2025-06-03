@@ -260,40 +260,25 @@ def assign_flares_to_fields(
     """
     Assign flares to oil/gas fields based on spatial and temporal criteria.
     
-    The assignment process:
-    1. Filters flares by H3 k-ring proximity and time range
-    2. For each field, attempts exact geometry matching first
-    3. If no exact matches, tries buffer zone matching (5km default)
-    4. Prevents double assignment of flares
-    5. Generates detailed CSV with assignment results
-    
-    **Input Options:**
-    - **field_ids**: Process specific fields by ID
-    - **country**: Process all fields in a country
-    - **Time range**: Required for all assignments
-    
     **Output:**
-    - Assignment statistics
-    - CSV download URL with detailed results
+    - Assignment statistics (always returned)
+    - CSV file saved to local path (if csv_output_path provided)
     
-    **Example Requests:**
+    **CSV Format:**
+    - field_id: Field identifier
+    - field_name: Field name
+    - field_country: Field country
+    - flare_sum: Total volume of all assigned flares for this field
+    - query_start_date: Start date of query
+    - query_end_date: End date of query
+    
+    **Example:**
     ```json
-    // Assign to specific fields
-    {
-        "start_date": "2024-01-01",
-        "end_date": "2024-12-31", 
-        "field_ids": [1, 2, 3],
-        "config": {
-            "proximity_distance_km": 100.0,
-            "buffer_distance_km": 5.0
-        }
-    }
-    
-    // Assign to all fields in a country
     {
         "start_date": "2024-01-01",
         "end_date": "2024-12-31",
-        "country": "Brazil"
+        "country": "Brazil",
+        "csv_output_path": "/home/user/brazil_flares_2024.csv"
     }
     ```
     """
@@ -306,17 +291,13 @@ def assign_flares_to_fields(
             field_ids=request.field_ids,
             country=request.country,
             proximity_distance_km=request.config.proximity_distance_km,
-            buffer_distance_km=request.config.buffer_distance_km
+            buffer_distance_km=request.config.buffer_distance_km,
+            csv_output_path=request.csv_output_path
         )
-        
-        # Generate download URL and filename
-        csv_filename = os.path.basename(csv_file_path)
-        download_url = f"{settings.API_V1_STR}/flares/download/{csv_filename}"
         
         return FlareAssignmentResponse(
             statistics=statistics,
-            csv_download_url=download_url,
-            csv_filename=csv_filename
+            csv_file_path=csv_file_path
         )
         
     except ValueError as e:
@@ -328,69 +309,4 @@ def assign_flares_to_fields(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing flare assignment: {str(e)}"
-        ) from e
-
-
-@router.get("/download/{filename}")
-def download_assignment_csv(
-    filename: str,
-    current_user: CurrentUser,
-):
-    """
-    Download generated assignment CSV file.
-    
-    **Security Notes:**
-    - Only downloads files from the assignments directory
-    - Validates filename to prevent path traversal
-    - Files are automatically cleaned up after a period
-    
-    **Usage:**
-    Use the CSV download URL returned from the `/assign-to-fields` endpoint.
-    """
-    # Validate filename to prevent path traversal
-    if ".." in filename or "/" in filename or "\\" in filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid filename"
-        )
-    
-    # Only allow CSV files
-    if not filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only CSV files can be downloaded"
-        )
-    
-    # Check if it's an assignment file (should contain 'flare_assignment')
-    if 'flare_assignment' not in filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid assignment file"
-        )
-    
-    try:
-        from app.utils.path_util import get_data_path
-        
-        file_path = get_data_path("assignments", filename)
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found or has expired"
-            )
-        
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}"
-            }
-        )
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error downloading file: {str(e)}"
         ) from e
