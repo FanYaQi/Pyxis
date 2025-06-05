@@ -5,7 +5,7 @@ Merge utilities for combining field data from multiple sources.
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Any, Optional, Tuple, Dict, Callable
 
 import numpy as np
@@ -22,6 +22,120 @@ logger = logging.getLogger(__name__)
 
 # Path to merge rules file
 MERGE_RULES_PATH = get_data_path("../../backend/app/configs/data_schemas/OPGEE_cols_merge_rules.json")
+
+
+# Time-weighted merge functions
+def calculate_time_overlap_days(record_start: Optional[date], record_end: Optional[date], 
+                               query_start: date, query_end: date) -> int:
+    """
+    Calculate overlap in days between record validity and query period.
+    
+    Args:
+        record_start: Start date of record validity (None means eternal start)
+        record_end: End date of record validity (None means eternal end)
+        query_start: Start date of query period
+        query_end: End date of query period
+        
+    Returns:
+        Number of overlapping days (0 if no overlap)
+    """
+    # Handle None dates (eternal validity)
+    effective_start = record_start if record_start is not None else query_start
+    effective_end = record_end if record_end is not None else query_end
+    
+    # Calculate overlap
+    overlap_start = max(effective_start, query_start)
+    overlap_end = min(effective_end, query_end)
+    
+    if overlap_start <= overlap_end:
+        return (overlap_end - overlap_start).days + 1  # +1 to include both end dates
+    else:
+        return 0
+
+
+def extract_values_with_time_weights(field_data_records, attr_name: str, 
+                                   query_start: date, query_end: date, 
+                                   is_dynamic: bool) -> List[Tuple[Any, float]]:
+    """
+    Extract values with time weights for dynamic attributes, or just values for static.
+    
+    Args:
+        field_data_records: List of PyxisFieldData records
+        attr_name: Name of the attribute to extract
+        query_start: Start date of query period
+        query_end: End date of query period
+        is_dynamic: Whether the attribute is dynamic (time-sensitive)
+        
+    Returns:
+        List of (value, weight) tuples
+    """
+    value_weight_pairs = []
+    total_query_days = (query_end - query_start).days + 1
+    
+    for record in field_data_records:
+        if not hasattr(record, attr_name):
+            continue
+            
+        value = getattr(record, attr_name)
+        if value is None:
+            continue
+        
+        if is_dynamic:
+            # For dynamic attributes, calculate time-based weight
+            record_start = getattr(record, 'valid_from', None)
+            record_end = getattr(record, 'valid_to', None)
+            
+            # Convert datetime to date if needed
+            if isinstance(record_start, datetime):
+                record_start = record_start.date()
+            if isinstance(record_end, datetime):
+                record_end = record_end.date()
+            
+            overlap_days = calculate_time_overlap_days(record_start, record_end, query_start, query_end)
+            
+            if overlap_days > 0:
+                weight = overlap_days / total_query_days
+                value_weight_pairs.append((value, weight))
+        else:
+            # For static attributes, all records have equal weight
+            value_weight_pairs.append((value, 1.0))
+    
+    return value_weight_pairs
+
+
+def time_weighted_average(value_weight_pairs: List[Tuple[float, float]]) -> Optional[float]:
+    """
+    Calculate time-weighted average: sum(value * weight) / sum(weights).
+    
+    Args:
+        value_weight_pairs: List of (value, weight) tuples
+        
+    Returns:
+        Time-weighted average or None if no valid values
+    """
+    if not value_weight_pairs:
+        return None
+    
+    # Filter out None values and convert to numbers
+    valid_pairs = []
+    for value, weight in value_weight_pairs:
+        if value is not None and weight > 0:
+            try:
+                valid_pairs.append((float(value), float(weight)))
+            except (ValueError, TypeError):
+                continue
+    
+    if not valid_pairs:
+        return None
+    
+    # Calculate weighted average
+    weighted_sum = sum(value * weight for value, weight in valid_pairs)
+    total_weight = sum(weight for _, weight in valid_pairs)
+    
+    if total_weight == 0:
+        return None
+    
+    return weighted_sum / total_weight
 
 
 # Core merge functions
@@ -43,6 +157,11 @@ def merge_average(values: List[Any]) -> Optional[float]:
         return None
     
     return np.average(numeric_values)
+
+
+def merge_time_weighted_average(value_weight_pairs: List[Tuple[Any, float]]) -> Optional[float]:
+    """Calculate time-weighted average from value-weight pairs."""
+    return time_weighted_average(value_weight_pairs)
 
 
 def merge_most_frequent(values: List[Any]) -> Any:
@@ -89,9 +208,9 @@ def merge_volume_weighted_average(values: List[Any], weights: List[Any]) -> Opti
     return weighted_sum / total_weight
 
 
-def merge_avg_age(values: List[Any]) -> Optional[int]:
+def merge_avg_age(values: List[Any], query_year: int) -> Optional[int]:
     """
-    Calculate average age using current year - average(years).
+    Calculate average age using query_year - average(years).
     """
     if not values:
         return None
@@ -109,13 +228,13 @@ def merge_avg_age(values: List[Any]) -> Optional[int]:
         return None
     
     avg_year = np.average(numeric_values)
-    current_year = datetime.now().year
-    return int(current_year - avg_year)
+    return int(query_year - avg_year)
 
 
 # Function mapping
 MERGE_FUNCTIONS = {
     "average": merge_average,
+    "time_weighted_average": merge_time_weighted_average,
     "most_frequent": merge_most_frequent,
 }
 
@@ -161,27 +280,43 @@ def apply_rounding(value: float, round_type: str) -> Any:
     return value
 
 
-def extract_values_for_attribute(field_data_records, attr_name: str) -> List[Any]:
+def extract_values_for_attribute(field_data_records, attr_name: str,
+                                query_start: Optional[date] = None,
+                                query_end: Optional[date] = None,
+                                is_dynamic: bool = False) -> List[Any]:
     """
     Extract values for a specific attribute from field data records.
     
     Args:
         field_data_records: List of PyxisFieldData records
         attr_name: Name of the attribute to extract
+        query_start: Start date for time filtering (for dynamic attributes)
+        query_end: End date for time filtering (for dynamic attributes)
+        is_dynamic: Whether to apply time filtering
     
     Returns:
         List of values for the attribute
     """
-    values = []
-    for record in field_data_records:
-        if hasattr(record, attr_name):
-            value = getattr(record, attr_name)
-            if value is not None:
-                values.append(value)
-    return values
+    if is_dynamic and query_start is not None and query_end is not None:
+        # Use time-weighted extraction for dynamic attributes
+        value_weight_pairs = extract_values_with_time_weights(
+            field_data_records, attr_name, query_start, query_end, is_dynamic
+        )
+        return [value for value, weight in value_weight_pairs]
+    else:
+        # Use simple extraction for static attributes
+        values = []
+        for record in field_data_records:
+            if hasattr(record, attr_name):
+                value = getattr(record, attr_name)
+                if value is not None:
+                    values.append(value)
+        return values
 
 
-def process_attribute(field_data_records, attr_name: str, rule: Dict) -> Any:
+def process_attribute(field_data_records, attr_name: str, rule: Dict,
+                     query_start: Optional[date] = None,
+                     query_end: Optional[date] = None) -> Any:
     """
     Process a single attribute using the specified rule.
     
@@ -189,41 +324,76 @@ def process_attribute(field_data_records, attr_name: str, rule: Dict) -> Any:
         field_data_records: List of PyxisFieldData records
         attr_name: Name of the attribute to process
         rule: Rule dictionary from JSON
+        query_start: Start date for time filtering
+        query_end: End date for time filtering
     
     Returns:
         Merged value for the attribute
     """
-    # Extract values for the attribute
-    values = extract_values_for_attribute(field_data_records, attr_name)
-    
-    if not values:
-        return None
-    
-    # Get method and special function from rule
+    # Get method, special function, and attribute type from rule
     method = rule.get("method")
     special_function = rule.get("function")
     round_type = rule.get("round")
+    attribute_type = rule.get("attribute_type", "static")  # Default to static
+    is_dynamic = attribute_type == "dynamic"
     
-    # Process based on special function or method
-    if special_function == "volume_weighted":
-        # Extract oil_prod values as weights
-        weights = extract_values_for_attribute(field_data_records, "oil_prod")
-        if not weights or len(weights) != len(values):
-            logger.warning(f"Cannot calculate volume weighted average for {attr_name}: missing or mismatched oil_prod values")
-            # Fallback to regular average
+    # Process based on method first, then special function
+    if method == "average":
+        if is_dynamic and query_start is not None and query_end is not None:
+            # Use time-weighted average for dynamic attributes
+            value_weight_pairs = extract_values_with_time_weights(
+                field_data_records, attr_name, query_start, query_end, is_dynamic
+            )
+            result = time_weighted_average(value_weight_pairs)
+        else:
+            # Use regular average for static attributes
+            values = extract_values_for_attribute(field_data_records, attr_name)
             result = merge_average(values)
-        else:
-            result = merge_volume_weighted_average(values, weights)
-    elif special_function == "avg_age":
-        result = merge_avg_age(values)
+            
+    elif method == "most_frequent":
+        # Most frequent doesn't need time weighting
+        values = extract_values_for_attribute(field_data_records, attr_name)
+        result = merge_most_frequent(values)
+        
     else:
-        # Use standard merge function
-        merge_func = MERGE_FUNCTIONS.get(method)
-        if merge_func:
-            result = merge_func(values)
+        logger.warning(f"Unknown merge method: {method} for attribute {attr_name}")
+        values = extract_values_for_attribute(field_data_records, attr_name)
+        result = values[0] if values else None
+    
+    # Apply special functions after basic processing
+    if special_function == "volume_weighted":
+        # First get time-weighted oil_prod values
+        oil_prod_pairs = extract_values_with_time_weights(
+            field_data_records, "oil_prod", query_start or date.today(), 
+            query_end or date.today(), True
+        ) if query_start and query_end else []
+        
+        if oil_prod_pairs:
+            # Get time-weighted oil_prod values as weights
+            oil_prod_weights = [weight for _, weight in oil_prod_pairs]
+            oil_prod_values = [value for value, _ in oil_prod_pairs]
+            
+            # Get corresponding attribute values
+            attr_pairs = extract_values_with_time_weights(
+                field_data_records, attr_name, query_start, query_end, is_dynamic
+            )
+            attr_values = [value for value, _ in attr_pairs]
+            
+            if len(attr_values) == len(oil_prod_values):
+                result = merge_volume_weighted_average(attr_values, oil_prod_values)
+            else:
+                logger.warning(f"Mismatched lengths for volume weighted average: {attr_name}")
+                result = time_weighted_average(attr_pairs) if attr_pairs else None
         else:
-            logger.warning(f"Unknown merge method: {method} for attribute {attr_name}")
-            result = values[0] if values else None
+            # Fallback to regular average if no oil_prod data
+            logger.warning(f"No oil_prod data for volume weighting {attr_name}, using regular average")
+            values = extract_values_for_attribute(field_data_records, attr_name)
+            result = merge_average(values)
+            
+    elif special_function == "avg_age":
+        values = extract_values_for_attribute(field_data_records, attr_name)
+        query_year = query_end.year if query_end else datetime.now().year
+        result = merge_avg_age(values, query_year)
     
     # Apply rounding if specified and result is numeric
     if result is not None and round_type and isinstance(result, (int, float)):
@@ -292,7 +462,9 @@ def merge_geometry(geometries: List[Any]) -> Tuple[Optional[Any], Optional[str]]
 
 def merge_specific_attributes(
     field_data_records, 
-    attributes: List[str]
+    attributes: List[str],
+    query_start: Optional[date] = None,
+    query_end: Optional[date] = None
 ) -> Dict[str, Any]:
     """
     Merge only the specified attributes from field data records using rules from JSON config.
@@ -300,6 +472,8 @@ def merge_specific_attributes(
     Args:
         field_data_records: List of PyxisFieldData records
         attributes: List of attribute names to merge (e.g., ['name', 'country', 'geometry'])
+        query_start: Start date for time filtering
+        query_end: End date for time filtering
     
     Returns:
         Dict with merged values for requested attributes only
@@ -320,7 +494,7 @@ def merge_specific_attributes(
             # Use rules from JSON config
             rule = merge_rules.get(attr)
             if rule:
-                merged_value = process_attribute(field_data_records, attr, rule)
+                merged_value = process_attribute(field_data_records, attr, rule, query_start, query_end)
                 if merged_value is not None:
                     merged_values[attr] = merged_value
             else:
@@ -333,12 +507,16 @@ def merge_specific_attributes(
     return merged_values
 
 
-def merge_all_attributes(field_data_records) -> Dict[str, Any]:
+def merge_all_attributes(field_data_records,
+                        query_start: Optional[date] = None,
+                        query_end: Optional[date] = None) -> Dict[str, Any]:
     """
     Merge all attributes defined in OPGEE_cols_merge_rules.json.
     
     Args:
         field_data_records: List of PyxisFieldData records
+        query_start: Start date for time filtering
+        query_end: End date for time filtering
         
     Returns:
         Dict with merged values for all defined attributes
@@ -348,7 +526,7 @@ def merge_all_attributes(field_data_records) -> Dict[str, Any]:
     
     # Process all attributes from the rules
     for attr_name, rule in merge_rules.items():
-        merged_value = process_attribute(field_data_records, attr_name, rule)
+        merged_value = process_attribute(field_data_records, attr_name, rule, query_start, query_end)
         if merged_value is not None:
             merged_values[attr_name] = merged_value
     

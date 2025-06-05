@@ -303,7 +303,7 @@ class FlareService:
         return deleted_count
 
     @staticmethod
-    def assign_flares_to_fields(
+    def assign_flares_to_fields_calculation(
         start_date: date,
         end_date: date,
         db: Session,
@@ -311,10 +311,9 @@ class FlareService:
         country: Optional[str] = None,
         proximity_distance_km: float = 100.0,
         buffer_distance_km: float = 5.0,
-        csv_output_path: Optional[str] = None  # Add this parameter
-    ) -> Tuple[Dict[str, Any], Optional[str]]:
+    ) -> Tuple[Dict[str, Any], Dict[int, Dict[str, Any]]]:
         """
-        Assign flares to fields based on spatial and temporal criteria.
+        Core flare assignment calculation without CSV generation.
         
         Args:
             start_date: Start date for time range filter
@@ -326,7 +325,23 @@ class FlareService:
             buffer_distance_km: Buffer distance for buffer matching
             
         Returns:
-            Tuple of (assignment_statistics, csv_file_path_or_none)
+            Tuple of (overall_statistics, field_assignments_dict)
+            
+            field_assignments_dict structure:
+            {
+                field_id: {
+                    'field_id': int,
+                    'field_name': str,
+                    'exact_volume': float,
+                    'buffer_volume': float, 
+                    'total_volume': float,
+                    'match_type': str,
+                    'exact_match_flares': List[Flare],
+                    'buffer_match_flares': List[Flare],
+                    'exact_match_flare_ids': List[str],
+                    'buffer_match_flare_ids': List[str]
+                }
+            }
         """
         start_time = datetime.now()
         
@@ -367,15 +382,54 @@ class FlareService:
             fields, candidate_flares, field_assignments, assigned_flare_ids
         )
         
-        # Step 5: Generate CSV file
-        csv_file_path = FlareService._generate_assignment_summary_csv(
-            field_assignments, fields, start_date, end_date, csv_output_path
-        )
-        
         processing_time = (datetime.now() - start_time).total_seconds()
         statistics['processing_time_seconds'] = processing_time
         
-        logger.info(f"Flare assignment completed in {processing_time:.2f} seconds")
+        logger.info(f"Flare assignment calculation completed in {processing_time:.2f} seconds")
+        
+        return statistics, field_assignments
+
+    @staticmethod
+    def assign_flares_to_fields(
+        start_date: date,
+        end_date: date,
+        db: Session,
+        field_ids: Optional[List[int]] = None,
+        country: Optional[str] = None,
+        proximity_distance_km: float = 100.0,
+        buffer_distance_km: float = 5.0,
+        csv_output_path: Optional[str] = None
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """
+        Assign flares to fields based on spatial and temporal criteria with optional CSV output.
+        
+        Args:
+            start_date: Start date for time range filter
+            end_date: End date for time range filter
+            db: Database session
+            field_ids: Optional list of specific field IDs
+            country: Optional country filter for fields
+            proximity_distance_km: Distance for H3 k-ring proximity filtering
+            buffer_distance_km: Buffer distance for buffer matching
+            csv_output_path: Optional path to save CSV file
+            
+        Returns:
+            Tuple of (assignment_statistics, csv_file_path_or_none)
+        """
+        # Call the core calculation function
+        statistics, field_assignments = FlareService.assign_flares_to_fields_calculation(
+            start_date, end_date, db, field_ids, country, 
+            proximity_distance_km, buffer_distance_km
+        )
+        
+        # Generate CSV file if requested
+        csv_file_path = None
+        if csv_output_path:
+            # Get fields for CSV generation
+            fields = FlareService._get_target_fields(db, field_ids, country)
+            csv_file_path = FlareService._generate_assignment_summary_csv(
+                field_assignments, fields, start_date, end_date, csv_output_path
+            )
         
         return statistics, csv_file_path
 
@@ -581,8 +635,8 @@ class FlareService:
         fields: List[PyxisFieldMeta],
         start_date: date,
         end_date: date,
-        output_path: Optional[str] = None
-    ) -> Optional[str]:
+        output_path: str
+    ) -> str:
         """
         Generate CSV file with aggregated assignment results per field.
         
@@ -591,14 +645,11 @@ class FlareService:
             fields: List of target fields
             start_date: Query start date
             end_date: Query end date
-            output_path: Optional local file path to save CSV
+            output_path: Local file path to save CSV
             
         Returns:
-            File path where CSV was saved, or None if no output_path provided
+            File path where CSV was saved
         """
-        if not output_path:
-            return None
-        
         try:
             # Ensure directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -621,7 +672,7 @@ class FlareService:
                         'field_id': field.id,
                         'field_name': field.name or '',
                         'field_country': field.country or '',
-                        'flare_sum': assignment['total_volume'],  # Sum of exact + buffer volumes
+                        'flare_sum': assignment['total_volume'],
                         'query_start_date': start_date,
                         'query_end_date': end_date
                     })
@@ -632,39 +683,3 @@ class FlareService:
         except Exception as e:
             logger.error(f"Error generating CSV file: {str(e)}")
             raise ValueError(f"Failed to write CSV to {output_path}: {str(e)}")
-
-    @staticmethod
-    def _calculate_assignment_statistics(
-        fields: List[PyxisFieldMeta],
-        candidate_flares: List[Flare],
-        field_assignments: Dict[int, Dict],
-        assigned_flare_ids: Set[str]
-    ) -> Dict[str, Any]:
-        """
-        Calculate assignment statistics.
-        
-        Args:
-            fields: List of target fields
-            candidate_flares: List of candidate flares
-            field_assignments: Field assignment results
-            assigned_flare_ids: Set of assigned flare IDs
-            
-        Returns:
-            Dict with assignment statistics
-        """
-        fields_with_exact = sum(1 for a in field_assignments.values() if a['match_type'] == 'exact')
-        fields_with_buffer = sum(1 for a in field_assignments.values() if a['match_type'] == 'buffer')
-        fields_with_no_matches = sum(1 for a in field_assignments.values() if a['match_type'] == 'none')
-        
-        total_volume_assigned = sum(a['total_volume'] for a in field_assignments.values())
-        
-        return {
-            'total_fields_processed': len(fields),
-            'fields_with_exact_matches': fields_with_exact,
-            'fields_with_buffer_matches': fields_with_buffer,
-            'fields_with_no_matches': fields_with_no_matches,
-            'total_flares_processed': len(candidate_flares),
-            'total_flares_assigned': len(assigned_flare_ids),
-            'total_volume_assigned': total_volume_assigned,
-            'unassigned_flares': len(candidate_flares) - len(assigned_flare_ids)
-        }

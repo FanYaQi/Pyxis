@@ -13,6 +13,7 @@ from .routes import (
     fields_data,
     flare,
     private,
+    opgee,
 )
 
 
@@ -25,6 +26,7 @@ router.include_router(data_sources.router)
 router.include_router(data_entries.router)
 router.include_router(fields_data.router)
 router.include_router(flare.router)
+router.include_router(opgee.router)
 
 
 if settings.ENVIRONMENT == "local":
