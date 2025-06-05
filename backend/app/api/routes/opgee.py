@@ -69,7 +69,10 @@ async def generate_opgee_input(
             field_ids=request.field_ids,
             country=request.country,
             flare_config=request.flare_config,
-            csv_output_path=request.csv_output_path
+            csv_output_path=request.csv_output_path,
+            require_multi_source_coverage=request.require_multi_source_coverage,
+            min_source_coverage_ratio=request.min_source_coverage_ratio,
+            trusted_source_types=request.trusted_source_types
         )
         
         # Create response

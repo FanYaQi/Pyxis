@@ -5,6 +5,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 from app.schemas.flare import FlareAssignmentConfig
+from app.postgres.models.data_source import SourceType
 
 
 class OpgeeInputRequest(BaseModel):
@@ -25,13 +26,23 @@ class OpgeeInputRequest(BaseModel):
     csv_output_path: Optional[str] = Field(
         None, description="Optional local file path to save CSV output"
     )
+    require_multi_source_coverage: bool = Field(
+        True, description="Filter fields by source coverage (default: True for opt-out)"
+    )
+    min_source_coverage_ratio: float = Field(
+        0.5, description="Minimum ratio of sources required (0.0-1.0)", ge=0.0, le=1.0
+    )
+    trusted_source_types: List[SourceType] = Field(
+        default=[SourceType.GOVERNMENT], 
+        description="Source types that bypass coverage requirements"
+    )
 
 
 class OpgeeInputStatistics(BaseModel):
     """Schema for OPGEE input generation statistics"""
     
     total_fields_processed: int = Field(
-        ..., description="Total number of fields processed"
+        ..., description="Total number of fields processed after filtering"
     )
     fields_with_data: int = Field(
         ..., description="Number of fields with valid data"
@@ -54,6 +65,19 @@ class OpgeeInputStatistics(BaseModel):
     )
     fields_with_no_flare_matches: int = Field(
         0, description="Number of fields with no flare matches"
+    )
+    # Source coverage filtering statistics
+    total_fields_before_source_filtering: Optional[int] = Field(
+        None, description="Total fields before source coverage filtering"
+    )
+    fields_filtered_by_source_coverage: Optional[int] = Field(
+        None, description="Number of fields filtered out by source coverage"
+    )
+    fields_with_trusted_source_exception: Optional[int] = Field(
+        None, description="Number of fields included via trusted source exception"
+    )
+    contributing_sources_count: Optional[int] = Field(
+        None, description="Total number of sources that contributed field data"
     )
 
 
