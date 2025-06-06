@@ -4,8 +4,7 @@ import logging
 import hashlib
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, List, Tuple, Set
-from collections import defaultdict
+from typing import Dict, Any, Optional, List, Tuple
 
 import logfire
 import pandas as pd
@@ -30,13 +29,14 @@ from app.schemas.data_entry_config import DataEntryConfiguration
 from app.utils.data_type_utils import convert_value
 from app.utils.merge_utils import merge_specific_attributes
 
+
 logger = logging.getLogger(__name__)
 
 # Matching threshold score - fields with score >= this will be considered matches
 MATCH_SCORE_THRESHOLD = 60
 # Weights for name and location in match score calculation [name_weight, geo_weight]
 MATCH_WEIGHTS = [0.7, 0.3]
-MAX_H3_DISTANCE = 50  # Maximum H3 grid distance for spatial matching
+
 
 async def validate_data_entry(
     db: Session,
@@ -217,31 +217,6 @@ async def trigger_data_processing(
         "status": ProcessingStatus.PROCESSING,
     }
 
-def get_nearby_h3_indices(center_h3: str, max_distance: int = MAX_H3_DISTANCE) -> Set[str]:
-    """
-    Get all H3 indices within max_distance of the center H3 index.
-    
-    Args:
-        center_h3: Center H3 index
-        max_distance: Maximum H3 grid distance
-        
-    Returns:
-        Set of H3 indices within the distance
-    """
-    if not center_h3:
-        return set()
-    
-    try:
-        nearby_indices = set()
-        # Get rings of neighbors up to max_distance
-        for distance in range(max_distance + 1):
-            ring_indices = h3.k_ring(center_h3, distance)
-            nearby_indices.update(ring_indices)
-        return nearby_indices
-    except Exception as e:
-        logger.warning(f"Failed to get nearby H3 indices for {center_h3}: {str(e)}")
-        return {center_h3}  # Return at least the center index
-    
 def calculate_match_score(
     name1: Optional[str],
     name2: Optional[str],
@@ -262,33 +237,31 @@ def calculate_match_score(
     Returns:
         float: Match score between 0 and 100
     """
-    # Calculate geographical distance score first (fast check)
-    geo_score = 0
-    if index1 is not None and index2 is not None:
-        try:
-            grid_distance = h3.h3_distance(index1, index2)
-            # Early exit if too far apart
-            if grid_distance > MAX_H3_DISTANCE:
-                return 0
-            
-            # Normalize distance to a score using Gaussian distribution
-            if grid_distance < MAX_H3_DISTANCE:
-                import numpy as np
-                geo_score = 100 * np.exp(-0.5 * np.power(grid_distance * 0.1, 2))
-            else:
-                geo_score = -40
-        except ValueError:
-            # Handle cases where distance cannot be computed
-            geo_score = -40
-
-    # Calculate name similarity score (only if geo check passed)
+    # Calculate name similarity score
     if name1 is not None and name2 is not None:
         name_score = fuzz.ratio(str(name1).lower(), str(name2).lower())
     else:
         name_score = 0
 
+    # Calculate geographical distance score
+    if index1 is not None and index2 is not None:
+        try:
+            grid_distance = h3.h3_distance(index1, index2)
+            if grid_distance < 50:
+                # Normalize distance to a score using Gaussian distribution
+                import numpy as np
+                geo_score = 100 * np.exp(-0.5 * np.power(grid_distance * 0.1, 2))
+            else:
+                geo_score = -40
+        except ValueError:
+            # Handle cases where distance cannot be computed (too far away)
+            geo_score = -40
+    else:
+        geo_score = 0
+
     # Combine scores using weights
     return weights[0] * name_score + weights[1] * geo_score
+
 
 def find_matching_field(
     field_name: Optional[str],
@@ -298,8 +271,7 @@ def find_matching_field(
     exclude_field_meta_ids: Optional[set] = None,
 ) -> Tuple[Optional[PyxisFieldMeta], float]:
     """
-    Find a matching PyxisFieldMeta based on name and location using comprehensive
-    PyxisFieldData matching with spatial pre-filtering.
+    Find a matching PyxisFieldMeta based on name and location.
 
     Args:
         field_name: Name of the field to match
@@ -314,79 +286,39 @@ def find_matching_field(
     if not field_name:
         return None, 0
 
-    # Step 1: Spatial pre-filtering using H3 indices
-    candidate_field_data = []
-    
-    if centroid_h3_index:
-        # Get nearby H3 indices for spatial filtering
-        nearby_h3_indices = get_nearby_h3_indices(centroid_h3_index, MAX_H3_DISTANCE)
-        
-        # Query only PyxisFieldData records within spatial proximity
-        query = db.query(PyxisFieldData).filter(
-            PyxisFieldData.centroid_h3_index.in_(nearby_h3_indices)
-        )
-        
-        if field_country:
-            query = query.filter(PyxisFieldData.country == field_country)
-            
-        candidate_field_data = query.all()
-        
-        logger.debug(f"Spatial filtering: {len(nearby_h3_indices)} H3 indices, {len(candidate_field_data)} candidate records")
-    else:
-        # Fallback: filter by country only if no H3 index
-        query = db.query(PyxisFieldData)
-        if field_country:
-            query = query.filter(PyxisFieldData.country == field_country)
-        candidate_field_data = query.all()
-        
-        logger.debug(f"No H3 index - country filtering: {len(candidate_field_data)} candidate records")
+    # Query for potential matches - filter by country if available to reduce candidates
+    query = db.query(PyxisFieldMeta)
+    if field_country:
+        query = query.filter(PyxisFieldMeta.country == field_country)
 
-    # Step 2: Group candidate data by field_meta_id
-    field_data_groups = defaultdict(list)
-    for data_record in candidate_field_data:
-        # Skip excluded field metas
-        if exclude_field_meta_ids and data_record.pyxis_field_meta_id in exclude_field_meta_ids:
-            continue
-        field_data_groups[data_record.pyxis_field_meta_id].append(data_record)
+    potential_matches = query.all()
 
-    # Step 3: Calculate best match score for each field meta
-    best_field_meta = None
+    # Exclude fields from current processing session if specified
+    if exclude_field_meta_ids:
+        potential_matches = [
+            field for field in potential_matches 
+            if field.id not in exclude_field_meta_ids
+        ]
+
+    best_match = None
     best_score = 0
-    best_match_details = None
 
-    for field_meta_id, data_records in field_data_groups.items():
-        # Calculate best score across all data points for this field
-        field_best_score = 0
-        best_data_record = None
-        
-        for data_record in data_records:
-            score = calculate_match_score(
-                field_name, 
-                data_record.name, 
-                centroid_h3_index, 
-                data_record.centroid_h3_index
-            )
-            
-            if score > field_best_score:
-                field_best_score = score
-                best_data_record = data_record
-
-        # Check if this field has the overall best score
-        if field_best_score > best_score:
-            best_score = field_best_score
-            # Get the corresponding PyxisFieldMeta
-            best_field_meta = db.get(PyxisFieldMeta, field_meta_id)
-            best_match_details = best_data_record
-
-    # Step 4: Return best match if it meets threshold
-    if best_field_meta and best_score >= MATCH_SCORE_THRESHOLD:
-        logger.info(
-            f"Best match: '{best_field_meta.name}' (score: {best_score:.1f}) "
-            f"matched via data record: '{best_match_details.name if best_match_details else 'N/A'}'"
+    # Calculate match scores for each potential match
+    for field in potential_matches:
+        score = calculate_match_score(
+            field_name, field.name, centroid_h3_index, field.centroid_h3_index
         )
-        return best_field_meta, best_score
+
+        if score > best_score:
+            best_score = score
+            best_match = field
+
+    # Return the best match if it meets the threshold
+    if best_match and best_score >= MATCH_SCORE_THRESHOLD:
+        return best_match, best_score
 
     return None, best_score
+
 
 @logfire.instrument("Background data processing task for data entry {data_entry=}")
 def process_data_entry_background(
