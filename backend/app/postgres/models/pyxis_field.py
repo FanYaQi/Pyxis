@@ -113,7 +113,7 @@ class PyxisFieldMeta(Base):
         index=True, comment="H3 index of the field centroid"
     )
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
-        Geometry("POLYGON", srid=4326), comment="Geometry of the field"
+        Geometry("GEOMETRY", srid=4326), comment="Geometry of the field"
     )
     # Relationship with pyxis_field_data
     pyxis_field_datas: Mapped[List["PyxisFieldData"]] = relationship(
@@ -176,7 +176,7 @@ class PyxisFieldData(Base):
         comment="H3 index of the field centroid"
     )
     geometry: Mapped[Optional[WKBElement]] = mapped_column(
-        Geometry("POLYGON", srid=4326), comment="Geometry of the field"
+    Geometry("GEOMETRY", srid=4326)  # NEW - accepts any geometry type
     )
     # Functional attributes
     functional_unit: Mapped[Optional[FunctionalUnit]] = mapped_column(
