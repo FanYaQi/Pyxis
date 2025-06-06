@@ -163,6 +163,7 @@ async def process_data_entry(
     background_tasks: BackgroundTasks,
     current_user: CurrentUser,
     db: DBSessionDep,
+    prevent_self_matching: bool = False,  # Add this parameter
 ) -> Dict[str, Any]:
     """
     Trigger processing of a data entry.
@@ -172,6 +173,7 @@ async def process_data_entry(
         background_tasks: FastAPI background tasks
         current_user: Current authenticated user
         db: Database session
+        prevent_self_matching: Prevent matching to fields from the same processing session
 
     Returns:
         Dict with processing status
@@ -192,8 +194,10 @@ async def process_data_entry(
             detail="You don't have access to this data entry's source",
         )
 
-    # Trigger processing
-    result = await trigger_data_processing(data_entry, background_tasks, db)
+    # Trigger processing with the prevent_self_matching option
+    result = await trigger_data_processing(
+        data_entry, background_tasks, db, prevent_self_matching
+    )
 
     if not result["success"]:
         raise HTTPException(

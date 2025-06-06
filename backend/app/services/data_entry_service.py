@@ -161,11 +161,11 @@ async def get_data_entry_status(data_entry_id: int, db: Session) -> Dict[str, An
         "processed_fields_count": get_processed_fields_count(data_entry_id, db),
     }
 
-
 async def trigger_data_processing(
     data_entry: DataEntry,
     background_tasks: BackgroundTasks,
     db: Session,
+    prevent_self_matching: bool = False,  # Add this parameter
 ) -> Dict[str, Any]:
     """
     Trigger data processing for a data entry.
@@ -174,6 +174,7 @@ async def trigger_data_processing(
         data_entry: Data entry object
         background_tasks: FastAPI background tasks
         db: Database session
+        prevent_self_matching: Prevent matching to fields from the same processing session
 
     Returns:
         Dict with result:
@@ -201,16 +202,17 @@ async def trigger_data_processing(
     db.add(data_entry)
     db.commit()
 
-    # Add background task
+    # Add background task with the prevent_self_matching parameter
     background_tasks.add_task(
         process_data_entry_background,
         data_entry,
         db,
+        prevent_self_matching,  # Pass the parameter
     )
 
     return {
         "success": True,
-        "message": f"Processing started for data entry with ID {data_entry.id}",
+        "message": f"Processing started for data entry with ID {data_entry.id} (prevent_self_matching: {prevent_self_matching})",
         "data_entry_id": data_entry.id,
         "status": ProcessingStatus.PROCESSING,
     }
@@ -266,6 +268,7 @@ def find_matching_field(
     field_country: Optional[str],
     centroid_h3_index: Optional[str],
     db: Session,
+    exclude_field_meta_ids: Optional[set] = None,
 ) -> Tuple[Optional[PyxisFieldMeta], float]:
     """
     Find a matching PyxisFieldMeta based on name and location.
@@ -275,6 +278,7 @@ def find_matching_field(
         field_country: Country of the field
         centroid_h3_index: H3 index of the field
         db: Database session
+        exclude_field_meta_ids: Set of field meta IDs to exclude from matching
 
     Returns:
         Tuple of (matching_field, match_score) or (None, 0) if no match found
@@ -288,6 +292,13 @@ def find_matching_field(
         query = query.filter(PyxisFieldMeta.country == field_country)
 
     potential_matches = query.all()
+
+    # Exclude fields from current processing session if specified
+    if exclude_field_meta_ids:
+        potential_matches = [
+            field for field in potential_matches 
+            if field.id not in exclude_field_meta_ids
+        ]
 
     best_match = None
     best_score = 0
@@ -310,22 +321,31 @@ def find_matching_field(
 
 
 @logfire.instrument("Background data processing task for data entry {data_entry=}")
-def process_data_entry_background(data_entry: DataEntry, db: Session) -> None:
+def process_data_entry_background(
+    data_entry: DataEntry, 
+    db: Session, 
+    prevent_self_matching: bool = False  # Add this parameter
+) -> None:
     """
     Process a data entry in the background.
 
     Args:
         data_entry: The data entry to process
         db: Database session
+        prevent_self_matching: Prevent matching to fields from the same processing session
     """
     db.add(data_entry)
     try:
-        logger.info("Starting background processing for data entry %s", data_entry.id)
+        logger.info(
+            "Starting background processing for data entry %s (prevent_self_matching: %s)", 
+            data_entry.id, 
+            prevent_self_matching
+        )
 
         # Process data based on file type
         with logfire.span(f"Process data for type {data_entry.file_extension}"):
             if data_entry.file_extension == FileExtension.CSV:
-                process_csv_data(data_entry, db)
+                process_csv_data(data_entry, db, prevent_self_matching)  # Pass parameter
             else:
                 # Set error for unsupported file types
                 data_entry.status = ProcessingStatus.FAILED
@@ -350,13 +370,20 @@ def process_data_entry_background(data_entry: DataEntry, db: Session) -> None:
         db.commit()
 
 
-def process_csv_data(data_entry: DataEntry, db: Session) -> None:
+# Replace the process_csv_data function in data_entry_service.py
+
+def process_csv_data(
+    data_entry: DataEntry, 
+    db: Session, 
+    prevent_self_matching: bool = False
+) -> None:
     """
     Process CSV data and create Pyxis field data entries.
 
     Args:
         data_entry: Data entry object
         db: Database session
+        prevent_self_matching: Prevent matching to fields from the same processing session
     """
     try:
         # Parse the config JSON to a Pydantic model
@@ -367,6 +394,8 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
     mappings = config_model.mappings
     if not mappings:
         raise ValueError("No mappings found in config file")
+
+    logger.info(f"Self-matching prevention: {'ENABLED' if prevent_self_matching else 'DISABLED'}")
 
     # Parse CSV data using configuration
     csv_config = (
@@ -390,14 +419,27 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
 
     # Track field metas that need to be merged
     field_metas_to_merge = set()
+    
+    # Track ONLY newly created field meta IDs (not matched ones)
+    newly_created_field_meta_ids = set()
 
     # Process each row in the CSV
-    for _, row in df.iterrows():
+    for row_index, row in df.iterrows():
         # Extract mapped data from the row
         field_attrs = extract_field_attributes(row, config_model)
 
-        # Find or create a PyxisFieldMeta record (without H3 update)
-        field_meta, is_new = get_or_create_field_meta(field_attrs, db)
+        # Exclude only newly created fields from this session
+        exclude_ids = newly_created_field_meta_ids if prevent_self_matching else None
+
+        # Find or create a PyxisFieldMeta record
+        field_meta, is_new = get_or_create_field_meta(field_attrs, db, exclude_ids)
+
+        # Only track newly created fields for exclusion (not matched existing fields)
+        if is_new:
+            newly_created_field_meta_ids.add(field_meta.id)
+        #     logger.info(f"Row {row_index}: Created NEW field '{field_meta.name}' (ID: {field_meta.id})")
+        # else:
+        #     logger.info(f"Row {row_index}: Matched to EXISTING field '{field_meta.name}' (ID: {field_meta.id})")
 
         # Create a PyxisFieldData record
         field_data = create_field_data(field_meta, field_attrs, data_entry)
@@ -415,6 +457,13 @@ def process_csv_data(data_entry: DataEntry, db: Session) -> None:
 
     # Commit all changes
     db.commit()
+    
+    logger.info(f"Processed {len(df)} rows with {len(field_metas_to_merge)} total fields")
+    logger.info(f"Created {len(newly_created_field_meta_ids)} new fields")
+    logger.info(f"Matched to {len(field_metas_to_merge) - len(newly_created_field_meta_ids)} existing fields")
+    
+    if prevent_self_matching:
+        logger.info(f"Self-matching prevention excluded {len(newly_created_field_meta_ids)} newly created field IDs from matching")
 
 
 def extract_field_attributes(
@@ -474,13 +523,17 @@ def extract_field_attributes(
 
 
 def get_or_create_field_meta(
-    field_attrs: Dict[str, Any], db: Session
+    field_attrs: Dict[str, Any], 
+    db: Session,
+    exclude_field_meta_ids: Optional[set] = None,
 ) -> Tuple[PyxisFieldMeta, bool]:
     """
     Find or create a PyxisFieldMeta record based on field attributes.
+    
     Args:
         field_attrs: Dictionary of field attributes
         db: Database session
+        exclude_field_meta_ids: Set of field meta IDs to exclude from matching
 
     Returns:
         Tuple of (PyxisFieldMeta object, is_new flag)
@@ -490,9 +543,9 @@ def get_or_create_field_meta(
     field_country = field_attrs.get("country")
     centroid_h3_index = field_attrs.get("centroid_h3_index")
 
-    # Try to find a matching field
+    # Try to find a matching field (excluding current session fields if specified)
     matching_field, match_score = find_matching_field(
-        field_name, field_country, centroid_h3_index, db
+        field_name, field_country, centroid_h3_index, db, exclude_field_meta_ids
     )
 
     if matching_field:
@@ -514,7 +567,6 @@ def get_or_create_field_meta(
     db.flush()  # Get ID assigned by database
     
     return new_field, True
-
 
 def update_pyxis_field_meta_merge(field_meta_id: int, db: Session) -> None:
     """
