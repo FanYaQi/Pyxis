@@ -1,8 +1,8 @@
 """Flare data schemas"""
 from typing import Optional, List
 from datetime import date, datetime
-
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+import enum
+from pydantic import BaseModel, Field, field_validator, ConfigDict,model_validator
 
 
 class FlareBase(BaseModel):
@@ -15,6 +15,10 @@ class FlareBase(BaseModel):
     valid_from: Optional[date] = Field(None, description="Start date when flare data is valid")
     valid_to: Optional[date] = Field(None, description="End date when flare data is valid")
 
+class FlareAllocationStrategy(str, enum.Enum):
+    """Strategy for allocating flares among competing fields"""
+    PRODUCTION_WEIGHTED = "production_weighted"
+    EQUAL_SPLIT = "equal_split"
 
 class FlareCreate(FlareBase):
     """Schema for creating a new flare record"""
@@ -66,8 +70,6 @@ class FlareUploadResponse(BaseModel):
     skipped_records: int
     errors: List[str] = Field(default_factory=list)
 
-
-# New schemas for flare assignment
 class FlareAssignmentConfig(BaseModel):
     """Configuration for flare assignment process"""
     
@@ -82,6 +84,10 @@ class FlareAssignmentConfig(BaseModel):
         description="Buffer distance in km for buffer zone matching", 
         gt=0,
         le=100
+    )
+    allocation_strategy: FlareAllocationStrategy = Field(
+        FlareAllocationStrategy.PRODUCTION_WEIGHTED,
+        description="Strategy for allocating flares among competing fields"
     )
 
 
@@ -103,35 +109,28 @@ class FlareAssignmentRequest(BaseModel):
             raise ValueError('end_date must be after or equal to start_date')
         return end_date
     
-    @field_validator('field_ids', 'country')
-    @classmethod
-    def validate_field_selection(cls, v, info):
+    @model_validator(mode='after')
+    def validate_field_selection(self):
         """Validate that either field_ids or country is provided, but not both"""
-        field_ids = info.data.get('field_ids') if 'field_ids' in info.data else v
-        country = info.data.get('country') if 'country' in info.data else v
-        
-        if field_ids is not None and country is not None:
+        if self.field_ids is not None and self.country is not None:
             raise ValueError('Provide either field_ids or country, not both')
         
-        if field_ids is None and country is None:
+        if self.field_ids is None and self.country is None:
             raise ValueError('Must provide either field_ids or country')
-        
-        return v
+            
+        return self
 
 
 class FlareAssignmentStatistics(BaseModel):
     """Statistics from flare assignment process"""
     
     total_fields_processed: int = Field(..., description="Total number of fields processed")
-    fields_with_exact_matches: int = Field(..., description="Fields with exact geometry matches")
+    fields_with_exact_matches: int = Field(..., description="Fields with exact geometry matches") 
     fields_with_buffer_matches: int = Field(..., description="Fields with buffer zone matches")
     fields_with_no_matches: int = Field(..., description="Fields with no flare matches")
-    total_flares_processed: int = Field(..., description="Total candidate flares processed")
     total_flares_assigned: int = Field(..., description="Total flares assigned to fields")
-    total_volume_assigned: float = Field(..., description="Total volume assigned to fields")
-    unassigned_flares: int = Field(..., description="Number of flares not assigned to any field")
+    total_flare_volume_assigned: float = Field(..., description="Total volume assigned to fields")
     processing_time_seconds: float = Field(..., description="Processing time in seconds")
-
 
 class FlareAssignmentResponse(BaseModel):
     """Response schema for flare assignment"""

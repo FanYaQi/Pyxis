@@ -24,6 +24,7 @@ from app.schemas.flare import (
     FlareFilter,
     FlareAssignmentRequest,
     FlareAssignmentResponse,
+    FlareAssignmentStatistics,
 )
 from app.services.flare_service import FlareService
 from app.configs.settings import settings
@@ -283,8 +284,7 @@ def assign_flares_to_fields(
     ```
     """
     try:
-        # Call the service method
-        statistics, csv_file_path = FlareService.assign_flares_to_fields(
+        statistics, field_assignments, csv_file_path = FlareService.assign_flares_to_fields(
             start_date=request.start_date,
             end_date=request.end_date,
             db=db,
@@ -292,11 +292,13 @@ def assign_flares_to_fields(
             country=request.country,
             proximity_distance_km=request.config.proximity_distance_km,
             buffer_distance_km=request.config.buffer_distance_km,
-            csv_output_path=request.csv_output_path
+            csv_output_path=request.csv_output_path,
+            allocation_strategy=request.config.allocation_strategy.value  # Add this line
         )
-        
+
+        # We only return statistics and csv_file_path (field_assignments is ignored)
         return FlareAssignmentResponse(
-            statistics=statistics,
+            statistics=FlareAssignmentStatistics(**statistics),
             csv_file_path=csv_file_path
         )
         

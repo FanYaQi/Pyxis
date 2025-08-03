@@ -303,93 +303,6 @@ class FlareService:
         return deleted_count
 
     @staticmethod
-    def assign_flares_to_fields_calculation(
-        start_date: date,
-        end_date: date,
-        db: Session,
-        field_ids: Optional[List[int]] = None,
-        country: Optional[str] = None,
-        proximity_distance_km: float = 100.0,
-        buffer_distance_km: float = 5.0,
-    ) -> Tuple[Dict[str, Any], Dict[int, Dict[str, Any]]]:
-        """
-        Core flare assignment calculation without CSV generation.
-        
-        Args:
-            start_date: Start date for time range filter
-            end_date: End date for time range filter
-            db: Database session
-            field_ids: Optional list of specific field IDs
-            country: Optional country filter for fields
-            proximity_distance_km: Distance for H3 k-ring proximity filtering
-            buffer_distance_km: Buffer distance for buffer matching
-            
-        Returns:
-            Tuple of (overall_statistics, field_assignments_dict)
-            
-            field_assignments_dict structure:
-            {
-                field_id: {
-                    'field_id': int,
-                    'field_name': str,
-                    'exact_volume': float,
-                    'buffer_volume': float, 
-                    'total_volume': float,
-                    'match_type': str,
-                    'exact_match_flares': List[Flare],
-                    'buffer_match_flares': List[Flare],
-                    'exact_match_flare_ids': List[str],
-                    'buffer_match_flare_ids': List[str]
-                }
-            }
-        """
-        start_time = datetime.now()
-        
-        # Validate inputs
-        if start_date > end_date:
-            raise ValueError("start_date must be before or equal to end_date")
-        
-        # Step 1: Get target fields
-        fields = FlareService._get_target_fields(db, field_ids, country)
-        if not fields:
-            raise ValueError("No fields found matching the criteria")
-        
-        logger.info(f"Processing {len(fields)} fields for flare assignment")
-        
-        # Step 2: Filter candidate flares
-        candidate_flares = FlareService._filter_candidate_flares(
-            fields, start_date, end_date, proximity_distance_km, db
-        )
-        
-        logger.info(f"Found {len(candidate_flares)} candidate flares")
-        
-        # Step 3: Perform field-by-field matching
-        field_assignments = {}
-        assigned_flare_ids = set()
-        
-        for field in fields:
-            assignment = FlareService._assign_flares_to_single_field(
-                field, candidate_flares, assigned_flare_ids, buffer_distance_km
-            )
-            field_assignments[field.id] = assignment
-            
-            # Track assigned flares to avoid double assignment
-            assigned_flare_ids.update(assignment['exact_match_flare_ids'])
-            assigned_flare_ids.update(assignment['buffer_match_flare_ids'])
-        
-        # Step 4: Generate statistics
-        statistics = FlareService._calculate_assignment_statistics(
-            fields, candidate_flares, field_assignments, assigned_flare_ids
-        )
-        
-        processing_time = (datetime.now() - start_time).total_seconds()
-        statistics['processing_time_seconds'] = processing_time
-        
-        logger.info(f"Flare assignment calculation completed in {processing_time:.2f} seconds")
-        
-        return statistics, field_assignments
-
-    @staticmethod
     def assign_flares_to_fields(
         start_date: date,
         end_date: date,
@@ -398,40 +311,344 @@ class FlareService:
         country: Optional[str] = None,
         proximity_distance_km: float = 100.0,
         buffer_distance_km: float = 5.0,
-        csv_output_path: Optional[str] = None
-    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        csv_output_path: Optional[str] = None,
+        allocation_strategy: str = "production_weighted"
+    ) -> Tuple[Dict[str, Any], Dict[int, Dict[str, Any]], Optional[str]]:
         """
-        Assign flares to fields based on spatial and temporal criteria with optional CSV output.
+        Assign flares to fields using field-centric approach with flexible allocation strategies.
+        """
+        from app.schemas.flare import FlareAllocationStrategy
+        from app.utils.merge_utils import merge_specific_attributes
         
-        Args:
-            start_date: Start date for time range filter
-            end_date: End date for time range filter
-            db: Database session
-            field_ids: Optional list of specific field IDs
-            country: Optional country filter for fields
-            proximity_distance_km: Distance for H3 k-ring proximity filtering
-            buffer_distance_km: Buffer distance for buffer matching
-            csv_output_path: Optional path to save CSV file
+        start_time = datetime.now()
+        
+        # Validate inputs
+        if start_date > end_date:
+            raise ValueError("start_date must be before or equal to end_date")
+        
+        # Convert string to enum
+        try:
+            allocation_strategy_enum = FlareAllocationStrategy(allocation_strategy)
+        except ValueError:
+            allocation_strategy_enum = FlareAllocationStrategy.PRODUCTION_WEIGHTED
+        
+        # Step 1: Get target fields
+        fields = FlareService._get_target_fields(db, field_ids, country)
+        if not fields:
+            raise ValueError("No fields found matching the criteria")
+        
+        logger.info(f"Processing {len(fields)} fields for flare assignment using {allocation_strategy_enum.value} strategy")
+        
+        # Step 2: Get production data if needed for production-weighted allocation
+        field_production_data = {}
+        if allocation_strategy_enum == FlareAllocationStrategy.PRODUCTION_WEIGHTED:
+            field_production_data = FlareService._get_field_production_data(
+                fields, start_date, end_date, db
+            )
+            logger.info(f"Retrieved production data for {len(field_production_data)} fields")
+        
+        # Step 3: For each field, find its candidate flares and matches
+        field_flare_matches = {}
+        total_candidate_flares = 0
+        
+        for field in fields:
+            # Get candidate flares for THIS field only
+            field_candidates = FlareService._get_candidate_flares_for_field(
+                field, start_date, end_date, proximity_distance_km, db
+            )
             
-        Returns:
-            Tuple of (assignment_statistics, csv_file_path_or_none)
-        """
-        # Call the core calculation function
-        statistics, field_assignments = FlareService.assign_flares_to_fields_calculation(
-            start_date, end_date, db, field_ids, country, 
-            proximity_distance_km, buffer_distance_km
+            total_candidate_flares += len(field_candidates)
+            
+            # Check matches for this field
+            exact_flares = []
+            buffer_flares = []
+            
+            for flare in field_candidates:
+                if field.geometry and FlareUtils.validate_geometry(field.geometry):
+                    if FlareUtils.point_in_geometry(flare.latitude, flare.longitude, field.geometry):
+                        exact_flares.append(flare)
+                    else:
+                        # Check buffer match only if no exact match
+                        buffered_geometry = FlareUtils.create_buffer_geometry(field.geometry, buffer_distance_km)
+                        if buffered_geometry and FlareUtils.point_in_buffer_geometry(flare.latitude, flare.longitude, buffered_geometry):
+                            buffer_flares.append(flare)
+            
+            field_flare_matches[field.id] = {
+                'exact': exact_flares,
+                'buffer': buffer_flares
+            }
+            
+            logger.debug(f"Field {field.id}: {len(exact_flares)} exact, {len(buffer_flares)} buffer matches")
+        
+        logger.info(f"Found {total_candidate_flares} total candidate flares across all fields")
+        
+        # Step 4: Build flare competition map (flare_id -> competing_fields_info)
+        flare_competition = FlareService._build_flare_competition_map(field_flare_matches)
+        logger.info(f"Built competition map for {len(flare_competition)} flares")
+        
+        # Step 5: Apply allocation strategy
+        field_assignments, stats = FlareService._allocate_by_competition(
+            flare_competition, allocation_strategy_enum, field_production_data, fields
         )
         
-        # Generate CSV file if requested
+        # Step 6: Finalize statistics
+        processing_time = (datetime.now() - start_time).total_seconds()
+        stats['processing_time_seconds'] = processing_time
+        
+        logger.info(f"Flare assignment completed in {processing_time:.2f} seconds")
+        
+        # Step 7: Generate CSV if requested
         csv_file_path = None
         if csv_output_path:
-            # Get fields for CSV generation
-            fields = FlareService._get_target_fields(db, field_ids, country)
-            csv_file_path = FlareService._generate_assignment_summary_csv(
+            csv_file_path = FlareService._generate_assignment_csv(
                 field_assignments, fields, start_date, end_date, csv_output_path
             )
         
-        return statistics, csv_file_path
+        return stats, field_assignments, csv_file_path
+
+    @staticmethod
+    def _get_candidate_flares_for_field(
+        field: PyxisFieldMeta,
+        start_date: date,
+        end_date: date,
+        proximity_distance_km: float,
+        db: Session
+    ) -> List[Flare]:
+        """
+        Get candidate flares for a specific field using H3 proximity and time range.
+        """
+        if not field.centroid_h3_index:
+            logger.debug(f"Field {field.id} has no H3 index, skipping")
+            return []
+        
+        # Get H3 indices around this field only
+        h3_indices = FlareUtils.get_h3_k_ring_for_distance(
+            field.centroid_h3_index, proximity_distance_km, flare_res
+        )
+        
+        if not h3_indices:
+            return []
+        
+        logger.debug(f"Field {field.id}: searching {len(h3_indices)} H3 indices")
+        
+        # Query flares for this field's H3 indices
+        candidate_flares = db.query(Flare).filter(
+            and_(
+                Flare.h3_index.in_(h3_indices),
+                or_(
+                    # Flare period overlaps with query period
+                    and_(Flare.valid_from <= end_date, Flare.valid_to >= start_date),
+                    # Handle NULL dates (eternal validity)
+                    and_(Flare.valid_from.is_(None), Flare.valid_to.is_(None)),
+                    and_(Flare.valid_from <= end_date, Flare.valid_to.is_(None)),
+                    and_(Flare.valid_from.is_(None), Flare.valid_to >= start_date)
+                )
+            )
+        ).all()
+        
+        return candidate_flares
+
+    @staticmethod
+    def _get_field_production_data(
+        fields: List[PyxisFieldMeta],
+        start_date: date,
+        end_date: date,
+        db: Session
+    ) -> Dict[int, float]:
+        """
+        Get oil production data for fields using merge utilities.
+        """
+        from app.utils.merge_utils import merge_specific_attributes
+        
+        field_production_data = {}
+        
+        for field in fields:
+            # Get all PyxisFieldData records for this field
+            field_data_records = db.query(PyxisFieldData).filter(
+                PyxisFieldData.pyxis_field_meta_id == field.id
+            ).all()
+            
+            if field_data_records:
+                # Merge oil_prod attribute for time range
+                merged_attributes = merge_specific_attributes(
+                    field_data_records=field_data_records,
+                    attributes=['oil_prod'],
+                    query_start=start_date,
+                    query_end=end_date
+                )
+                
+                oil_prod = merged_attributes.get('oil_prod')
+                if oil_prod is not None and oil_prod > 0:
+                    field_production_data[field.id] = float(oil_prod)
+                else:
+                    field_production_data[field.id] = 1.0  # Default value
+                    logger.debug(f"Field {field.id}: Using default oil_prod=1.0")
+            else:
+                field_production_data[field.id] = 1.0  # Default value
+                logger.debug(f"Field {field.id}: No data records, using default oil_prod=1.0")
+        
+        return field_production_data
+
+    @staticmethod
+    def _build_flare_competition_map(
+        field_flare_matches: Dict[int, Dict[str, List[Flare]]]
+    ) -> Dict[str, Dict]:
+        """
+        Build a map of flare_id -> competing fields info.
+        """
+        flare_competition = {}
+        
+        # Build flare_id -> {exact_fields: [], buffer_fields: [], flare_object: flare}
+        for field_id, matches in field_flare_matches.items():
+            # Process exact matches
+            for flare in matches['exact']:
+                if flare.flare_id not in flare_competition:
+                    flare_competition[flare.flare_id] = {
+                        'exact_fields': [],
+                        'buffer_fields': [],
+                        'flare_object': flare
+                    }
+                flare_competition[flare.flare_id]['exact_fields'].append(field_id)
+            
+            # Process buffer matches
+            for flare in matches['buffer']:
+                if flare.flare_id not in flare_competition:
+                    flare_competition[flare.flare_id] = {
+                        'exact_fields': [],
+                        'buffer_fields': [],
+                        'flare_object': flare
+                    }
+                flare_competition[flare.flare_id]['buffer_fields'].append(field_id)
+        
+        return flare_competition
+
+    @staticmethod 
+    def _allocate_by_competition(
+        flare_competition: Dict[str, Dict],
+        allocation_strategy: 'FlareAllocationStrategy',
+        field_production_data: Dict[int, float],
+        fields: List[PyxisFieldMeta]
+    ) -> Tuple[Dict[int, Dict[str, Any]], Dict[str, Any]]:
+        """
+        Allocate flares based on competition rules and allocation strategy.
+        """
+        from app.schemas.flare import FlareAllocationStrategy
+        
+        # Initialize field assignments
+        field_assignments = {}
+        for field in fields:
+            field_assignments[field.id] = {
+                'field_id': field.id,
+                'field_name': field.name,
+                'exact_match_flare_ids': [],
+                'buffer_match_flare_ids': [],
+                'exact_volume': 0.0,
+                'buffer_volume': 0.0,
+                'total_volume': 0.0,
+                'match_type': 'none'
+            }
+        
+        # Initialize statistics
+        stats = {
+            'total_fields_processed': len(fields),
+            'fields_with_exact_matches': 0,
+            'fields_with_buffer_matches': 0,
+            'fields_with_no_matches': 0,
+            'total_flare_volume_assigned': 0.0,
+            'total_flares_assigned': 0
+        }
+        
+        # Process each flare
+        for flare_id, competition_info in flare_competition.items():
+            flare = competition_info['flare_object']
+            exact_fields = competition_info['exact_fields']
+            buffer_fields = competition_info['buffer_fields']
+            
+            # Apply competition rules: exact takes priority
+            if exact_fields:
+                competing_field_ids = exact_fields
+                match_type = 'exact'
+            elif buffer_fields:
+                competing_field_ids = buffer_fields
+                match_type = 'buffer'
+            else:
+                continue  # No matches
+            
+            # Apply allocation strategy
+            if len(competing_field_ids) == 1:
+                # No competition, assign entire flare
+                allocated_volumes = {competing_field_ids[0]: flare.volume}
+            else:
+                # Competition exists, apply strategy
+                if allocation_strategy == FlareAllocationStrategy.PRODUCTION_WEIGHTED:
+                    allocated_volumes = FlareService._allocate_by_production(
+                        flare.volume, competing_field_ids, field_production_data
+                    )
+                else:  # EQUAL_SPLIT
+                    allocated_volumes = FlareService._allocate_equally(
+                        flare.volume, competing_field_ids
+                    )
+            
+            # Update field assignments
+            for field_id, allocated_volume in allocated_volumes.items():
+                if match_type == 'exact':
+                    field_assignments[field_id]['exact_match_flare_ids'].append(flare_id)
+                    field_assignments[field_id]['exact_volume'] += allocated_volume
+                else:  # buffer
+                    field_assignments[field_id]['buffer_match_flare_ids'].append(flare_id)
+                    field_assignments[field_id]['buffer_volume'] += allocated_volume
+                
+                field_assignments[field_id]['total_volume'] += allocated_volume
+                stats['total_flare_volume_assigned'] += allocated_volume
+        
+        # Update field match types and statistics
+        for field_id, assignment in field_assignments.items():
+            if assignment['exact_volume'] > 0:
+                assignment['match_type'] = 'exact'
+                stats['fields_with_exact_matches'] += 1
+            elif assignment['buffer_volume'] > 0:
+                assignment['match_type'] = 'buffer'
+                stats['fields_with_buffer_matches'] += 1
+            else:
+                stats['fields_with_no_matches'] += 1
+        
+        stats['total_flares_assigned'] = len(flare_competition)
+        
+        return field_assignments, stats
+
+    @staticmethod
+    def _allocate_by_production(
+        flare_volume: float,
+        competing_field_ids: List[int],
+        field_production_data: Dict[int, float]
+    ) -> Dict[int, float]:
+        """
+        Allocate flare volume proportionally based on oil production.
+        """
+        total_production = sum(field_production_data.get(field_id, 1.0) for field_id in competing_field_ids)
+        
+        if total_production <= 0:
+            # Fallback to equal split if no production data
+            return FlareService._allocate_equally(flare_volume, competing_field_ids)
+        
+        allocated_volumes = {}
+        for field_id in competing_field_ids:
+            field_production = field_production_data.get(field_id, 1.0)
+            allocation_ratio = field_production / total_production
+            allocated_volumes[field_id] = flare_volume * allocation_ratio
+        
+        return allocated_volumes
+
+    @staticmethod
+    def _allocate_equally(
+        flare_volume: float,
+        competing_field_ids: List[int]
+    ) -> Dict[int, float]:
+        """
+        Allocate flare volume equally among competing fields.
+        """
+        volume_per_field = flare_volume / len(competing_field_ids)
+        return {field_id: volume_per_field for field_id in competing_field_ids}
 
     @staticmethod
     def _get_target_fields(
@@ -467,170 +684,7 @@ class FlareService:
             raise ValueError("Must provide either field_ids or country")
 
     @staticmethod
-    def _filter_candidate_flares(
-        fields: List[PyxisFieldMeta],
-        start_date: date,
-        end_date: date,
-        proximity_distance_km: float,
-        db: Session
-    ) -> List[Flare]:
-        """
-        Filter candidate flares based on H3 proximity and time range.
-        
-        Args:
-            fields: List of target fields
-            start_date: Start date for time filter
-            end_date: End date for time filter
-            proximity_distance_km: Distance for H3 k-ring filtering
-            db: Database session
-            
-        Returns:
-            List of candidate flares
-        """
-        
-        # Collect all H3 indices within proximity of any field
-        all_h3_indices = set()
-        
-        for field in fields:
-            if field.centroid_h3_index:
-                nearby_h3_indices = FlareUtils.get_h3_k_ring_for_distance(
-                    field.centroid_h3_index, proximity_distance_km, flare_res
-                )
-                all_h3_indices.update(nearby_h3_indices)
-                logger.debug(f"Field {field.id}: found {len(nearby_h3_indices)} nearby H3 indices")
-        
-        if not all_h3_indices:
-            logger.warning("No H3 indices found for fields")
-            return []
-        
-        logger.info(f"Searching in {len(all_h3_indices)} H3 indices")
-        
-        # Query flares within H3 proximity and time range
-        candidate_flares = db.query(Flare).filter(
-            and_(
-                Flare.h3_index.in_(all_h3_indices),
-                or_(
-                    # Flare period overlaps with query period
-                    and_(Flare.valid_from <= end_date, Flare.valid_to >= start_date),
-                    # Handle NULL dates (eternal validity)
-                    and_(Flare.valid_from.is_(None), Flare.valid_to.is_(None)),
-                    and_(Flare.valid_from <= end_date, Flare.valid_to.is_(None)),
-                    and_(Flare.valid_from.is_(None), Flare.valid_to >= start_date)
-                )
-            )
-        ).all()
-        
-        return candidate_flares
-
-    @staticmethod
-    def _assign_flares_to_single_field(
-        field: PyxisFieldMeta,
-        candidate_flares: List[Flare],
-        already_assigned: Set[str],
-        buffer_distance_km: float
-    ) -> Dict[str, Any]:
-        """
-        Assign flares to a single field using exact then buffer matching.
-        
-        Args:
-            field: Target field
-            candidate_flares: List of candidate flares
-            already_assigned: Set of already assigned flare IDs
-            buffer_distance_km: Buffer distance for buffer matching
-            
-        Returns:
-            Dict with assignment results for the field
-        """
-        from app.utils.flare_utils import FlareUtils
-        
-        available_flares = [f for f in candidate_flares if f.flare_id not in already_assigned]
-        
-        # Validate field has geometry
-        if not field.geometry or not FlareUtils.validate_geometry(field.geometry):
-            logger.warning(f"Field {field.id} has no valid geometry, skipping")
-            return {
-                'field_id': field.id,
-                'field_name': field.name,
-                'exact_match_flares': [],
-                'buffer_match_flares': [],
-                'exact_match_flare_ids': [],
-                'buffer_match_flare_ids': [],
-                'exact_volume': 0.0,
-                'buffer_volume': 0.0,
-                'total_volume': 0.0,
-                'match_type': 'none'
-            }
-        
-        # Step 1: Try exact matching
-        exact_matches = []
-        for flare in available_flares:
-            if FlareUtils.point_in_geometry(flare.latitude, flare.longitude, field.geometry):
-                exact_matches.append(flare)
-        
-        # Step 2: If no exact matches, try buffer matching
-        buffer_matches = []
-        if not exact_matches:
-            buffered_geometry = FlareUtils.create_buffer_geometry(field.geometry, buffer_distance_km)
-            if buffered_geometry:
-                for flare in available_flares:
-                    if FlareUtils.point_in_buffer_geometry(flare.latitude, flare.longitude, buffered_geometry):
-                        buffer_matches.append(flare)
-        
-        # Calculate volumes
-        exact_volume = sum(f.volume for f in exact_matches)
-        buffer_volume = sum(f.volume for f in buffer_matches)
-        
-        return {
-            'field_id': field.id,
-            'field_name': field.name,
-            'exact_match_flares': exact_matches,
-            'buffer_match_flares': buffer_matches,
-            'exact_match_flare_ids': [f.flare_id for f in exact_matches],
-            'buffer_match_flare_ids': [f.flare_id for f in buffer_matches],
-            'exact_volume': exact_volume,
-            'buffer_volume': buffer_volume,
-            'total_volume': exact_volume + buffer_volume,
-            'match_type': 'exact' if exact_matches else ('buffer' if buffer_matches else 'none')
-        }
-
-    @staticmethod
-    def _calculate_assignment_statistics(
-        fields: List[PyxisFieldMeta],
-        candidate_flares: List[Flare],
-        field_assignments: Dict[int, Dict],
-        assigned_flare_ids: Set[str]
-    ) -> Dict[str, Any]:
-        """
-        Calculate assignment statistics.
-        
-        Args:
-            fields: List of target fields
-            candidate_flares: List of candidate flares
-            field_assignments: Field assignment results
-            assigned_flare_ids: Set of assigned flare IDs
-            
-        Returns:
-            Dict with assignment statistics
-        """
-        fields_with_exact = sum(1 for a in field_assignments.values() if a['match_type'] == 'exact')
-        fields_with_buffer = sum(1 for a in field_assignments.values() if a['match_type'] == 'buffer')
-        fields_with_no_matches = sum(1 for a in field_assignments.values() if a['match_type'] == 'none')
-        
-        total_volume_assigned = sum(a['total_volume'] for a in field_assignments.values())
-        
-        return {
-            'total_fields_processed': len(fields),
-            'fields_with_exact_matches': fields_with_exact,
-            'fields_with_buffer_matches': fields_with_buffer,
-            'fields_with_no_matches': fields_with_no_matches,
-            'total_flares_processed': len(candidate_flares),
-            'total_flares_assigned': len(assigned_flare_ids),
-            'total_volume_assigned': total_volume_assigned,
-            'unassigned_flares': len(candidate_flares) - len(assigned_flare_ids)
-        }
-
-    @staticmethod
-    def _generate_assignment_summary_csv(
+    def _generate_assignment_csv(
         field_assignments: Dict[int, Dict],
         fields: List[PyxisFieldMeta],
         start_date: date,
@@ -638,7 +692,7 @@ class FlareService:
         output_path: str
     ) -> str:
         """
-        Generate CSV file with aggregated assignment results per field.
+        Generate CSV file with flare assignment results.
         
         Args:
             field_assignments: Field assignment results
@@ -677,7 +731,7 @@ class FlareService:
                         'query_end_date': end_date
                     })
             
-            logger.info(f"Generated assignment CSV: {output_path}")
+            logger.info(f"Generated flare assignment CSV: {output_path}")
             return output_path
             
         except Exception as e:

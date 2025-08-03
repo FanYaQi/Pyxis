@@ -1,5 +1,6 @@
 """
 Service for generating OPGEE-compatible input data.
+Updated with new flow: merge first, then assign flares, then calculate FOR.
 """
 
 import csv
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class OpgeeService:
-    """Service for generating OPGEE input data"""
+    """Service for generating OPGEE input data with improved flow"""
 
     @staticmethod
     @logfire.instrument("Generate OPGEE input for time range {start_date} to {end_date}")
@@ -38,10 +39,16 @@ class OpgeeService:
         csv_output_path: Optional[str] = None,
         require_multi_source_coverage: bool = True,
         min_source_coverage_ratio: float = 0.5,
-        trusted_source_types: List[SourceType] = None
+        trusted_source_types: List[SourceType] = None,
+        debug_mode: bool = False
     ) -> Tuple[Dict[str, Any], Optional[str]]:
         """
-        Generate OPGEE-compatible input by merging field data and integrating flare assignments.
+        Generate OPGEE-compatible input with NEW FLOW:
+        1. Get fields and apply source filtering
+        2. Merge field data for each filtered field
+        3. Assign flares using original field geometries  
+        4. Calculate FOR using merged oil_prod + assigned flare volumes
+        5. Generate final CSV output
         
         Args:
             start_date: Start date for time range filter
@@ -54,6 +61,7 @@ class OpgeeService:
             require_multi_source_coverage: Filter fields by source coverage
             min_source_coverage_ratio: Minimum ratio of sources required (0.0-1.0)
             trusted_source_types: Source types that bypass coverage requirements
+            debug_mode: Enable detailed logging for debugging
             
         Returns:
             Tuple of (statistics_dict, csv_file_path_or_none)
@@ -68,7 +76,7 @@ class OpgeeService:
         if start_date > end_date:
             raise ValueError("start_date must be before or equal to end_date")
         
-        logger.info(f"Starting OPGEE input generation for {start_date} to {end_date}")
+        logger.info(f"Starting OPGEE input generation for {start_date} to {end_date} (debug={debug_mode})")
         
         # Step 1: Get target fields
         with logfire.span("Get target fields"):
@@ -77,8 +85,8 @@ class OpgeeService:
                 raise ValueError("No fields found matching the criteria")
             
             logger.info(f"Found {len(fields)} initial fields")
-        
-        # Step 1.5: Apply source coverage filter BEFORE flare assignment
+            
+        # Step 2: Apply source coverage filter
         source_filter_stats = {}
         if require_multi_source_coverage:
             with logfire.span("Filter fields by source coverage"):
@@ -89,30 +97,51 @@ class OpgeeService:
                     raise ValueError("No fields remaining after source coverage filtering")
                 
                 logger.info(f"After source filtering: {len(fields)} fields remaining")
+    
+        # Step 3: NEW - Merge field data FIRST (before flare assignment)
+        with logfire.span("Merge field data for filtered fields"):
+            merged_field_data = OpgeeService._merge_field_data_for_fields(
+                fields, start_date, end_date, db, debug_mode
+            )
+            
+            logger.info(f"Merged data for {len(merged_field_data)} fields")
         
-        # Step 2: Assign flares to fields (calculation only)
-        with logfire.span("Assign flares to fields"):
-            flare_stats, field_flare_assignments = FlareService.assign_flares_to_fields_calculation(
+        # Step 4: Assign flares using original field geometries
+        with logfire.span("Assign flares to filtered fields"):
+            flare_stats, field_flare_assignments, _ = FlareService.assign_flares_to_fields(
                 start_date=start_date,
                 end_date=end_date,
                 db=db,
                 field_ids=[f.id for f in fields],  # Use filtered field IDs
-                country=None,  # Don't filter by country again
                 proximity_distance_km=flare_config.proximity_distance_km,
-                buffer_distance_km=flare_config.buffer_distance_km
+                buffer_distance_km=flare_config.buffer_distance_km,
+                allocation_strategy=flare_config.allocation_strategy.value  # Add this line
             )
             
             logger.info(f"Flare assignment completed: {flare_stats['total_flares_assigned']} flares assigned")
         
-        # Step 3: Process each field
-        with logfire.span("Process field data and calculate FOR"):
+        # Step 5: Calculate FOR using merged oil_prod + assigned flare volumes
+        with logfire.span("Calculate FOR from assignments and merged data"):
+            merged_oil_prod_data = {
+                field_id: merged_data.get('oil_prod') 
+                for field_id, merged_data in merged_field_data.items()
+            }
+            
+            for_values = OpgeeService.calculate_for_from_assignments(
+                field_flare_assignments, merged_oil_prod_data, start_date, end_date
+            )
+            
+            logger.info(f"Calculated FOR for {len(for_values)} fields")
+        
+        # Step 6: Generate final OPGEE data combining merged attributes + FOR
+        with logfire.span("Generate final OPGEE data"):
             opgee_data = []
             fields_with_data = 0
             fields_with_flare = 0
             
             for field in fields:
-                field_result = OpgeeService._process_single_field(
-                    field, start_date, end_date, db, field_flare_assignments
+                field_result = OpgeeService._create_final_field_record(
+                    field, merged_field_data, for_values
                 )
                 
                 if field_result:
@@ -121,8 +150,10 @@ class OpgeeService:
                     
                     if field_result.get('for_value', 0) > 0:
                         fields_with_flare += 1
+            
+            logger.info(f"Generated OPGEE data for {fields_with_data} fields, {fields_with_flare} with flares")
         
-        # Step 4: Generate CSV if requested
+        # Step 7: Generate CSV if requested
         csv_file_path = None
         if csv_output_path:
             with logfire.span("Generate CSV output"):
@@ -130,14 +161,14 @@ class OpgeeService:
                     opgee_data, csv_output_path, start_date, end_date
                 )
         
-        # Step 5: Calculate final statistics
+        # Step 8: Calculate final statistics
         processing_time = (datetime.now() - start_time).total_seconds()
         
         statistics = {
             'total_fields_processed': len(fields),
             'fields_with_data': fields_with_data,
             'fields_with_flare_assignment': fields_with_flare,
-            'total_flare_volume_assigned': flare_stats.get('total_volume_assigned', 0.0),
+            'total_flare_volume_assigned': flare_stats.get('total_flare_volume_assigned', 0.0),
             'processing_time_seconds': processing_time,
             'fields_with_exact_flare_matches': flare_stats.get('fields_with_exact_matches', 0),
             'fields_with_buffer_flare_matches': flare_stats.get('fields_with_buffer_matches', 0),
@@ -156,6 +187,149 @@ class OpgeeService:
         logger.info(f"OPGEE input generation completed in {processing_time:.2f} seconds")
         
         return statistics, csv_file_path
+
+    @staticmethod
+    def calculate_for_from_assignments(
+        field_assignments: Dict[int, Dict[str, Any]],
+        merged_oil_prod_data: Dict[int, Optional[float]], 
+        start_date: date,
+        end_date: date
+    ) -> Dict[int, float]:
+        """
+        Calculate FOR values using flare assignments and merged oil production data.
+        
+        Args:
+            field_assignments: Result from FlareService.assign_flares_to_fields()
+            merged_oil_prod_data: field_id -> merged oil_prod (None allowed)
+            start_date: Start date for calculation
+            end_date: End date for calculation
+            
+        Returns:
+            Dict mapping field_id -> for_value (scf/bbl_oil)
+        """
+        for_values = {}
+        days_in_range = (end_date - start_date).days + 1
+        
+        for field_id, assignment in field_assignments.items():
+            flare_volume_bcm = assignment.get('total_volume', 0.0)
+            oil_prod = merged_oil_prod_data.get(field_id)
+            
+            # Handle null oil_prod with default value and logging
+            if oil_prod is None or oil_prod <= 0:
+                original_value = oil_prod
+                oil_prod = 1.0  # Default value
+                if field_id in merged_oil_prod_data:  # Was explicitly provided but None/zero
+                    logger.warning(f"Field {field_id}: Using default oil_prod=1.0 (original was {original_value})")
+            
+            # Calculate FOR: Convert BCM to SCF, then divide by total oil production
+            flare_volume_scf = flare_volume_bcm * 35.3147e9  # 1 BCM = 35.3147 billion SCF
+            total_oil_prod_bbl = oil_prod * days_in_range
+            for_value = flare_volume_scf / total_oil_prod_bbl if total_oil_prod_bbl > 0 else 0.0
+            
+            for_values[field_id] = for_value
+            
+            logger.debug(f"Field {field_id} FOR calculation: {flare_volume_bcm:.6f} BCM, "
+                        f"{oil_prod} bbl/day, {days_in_range} days → {for_value:.6f} scf/bbl_oil")
+            
+        return for_values
+
+    @staticmethod
+    def _merge_field_data_for_fields(
+        fields: List[PyxisFieldMeta],
+        start_date: date,
+        end_date: date,
+        db: Session,
+        debug_mode: bool = False
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Merge field data for each field using the existing merge utilities.
+        
+        Args:
+            fields: List of filtered PyxisFieldMeta objects
+            start_date: Start date for time filtering
+            end_date: End date for time filtering
+            db: Database session
+            debug_mode: Enable debug logging
+            
+        Returns:
+            Dict mapping field_id -> merged_attributes
+        """
+        merged_field_data = {}
+        mergeable_attributes = OpgeeService._get_mergeable_attributes()
+        
+        for field in fields:
+            # Get all PyxisFieldData records for this field
+            field_data_records = db.query(PyxisFieldData).filter(
+                PyxisFieldData.pyxis_field_meta_id == field.id
+            ).all()
+            
+            if debug_mode:
+                logger.debug(f"Field {field.id} has {len(field_data_records)} data records")
+            
+            if field_data_records:
+                # Merge attributes using existing merge utilities
+                merged_attributes = merge_specific_attributes(
+                    field_data_records=field_data_records,
+                    attributes=mergeable_attributes,
+                    query_start=start_date,
+                    query_end=end_date
+                )
+                merged_field_data[field.id] = merged_attributes
+                
+                if debug_mode:
+                    logger.debug(f"Field {field.id} merged {len(merged_attributes)} attributes")
+            else:
+                # No data records for this field
+                merged_field_data[field.id] = {}
+                if debug_mode:
+                    logger.debug(f"Field {field.id} has no data records")
+        
+        return merged_field_data
+
+    @staticmethod
+    def _create_final_field_record(
+        field: PyxisFieldMeta,
+        merged_field_data: Dict[int, Dict[str, Any]],
+        for_values: Dict[int, float]
+    ) -> Dict[str, Any]:
+        """
+        Create final field record combining merged attributes and calculated FOR.
+        
+        Args:
+            field: PyxisFieldMeta object
+            merged_field_data: Dict of merged field data
+            for_values: Dict of calculated FOR values
+            
+        Returns:
+            Final field record for CSV output
+        """
+        # Start with pyxis_field_code
+        result = {
+            'pyxis_field_code': field.pyxis_field_code
+        }
+        
+        # Add merged attributes
+        merged_attributes = merged_field_data.get(field.id, {})
+        result.update(merged_attributes)
+        
+        # Add calculated FOR value
+        for_value = for_values.get(field.id, 0.0)
+        result['for_value'] = for_value
+        
+        return result
+
+    @staticmethod
+    def _get_mergeable_attributes() -> List[str]:
+        """Get list of attributes that should be merged (excludes calculated fields)."""
+        from app.utils.merge_utils import load_merge_rules
+        return list(load_merge_rules().keys())
+
+    @staticmethod
+    def _get_output_attributes() -> List[str]:
+        """Get list of all attributes for CSV output (includes calculated fields)."""
+        mergeable = OpgeeService._get_mergeable_attributes()
+        calculated = ['for_value']  # Add other calculated fields here if needed
+        return mergeable + calculated
 
     @staticmethod
     def _get_target_fields(
@@ -303,145 +477,6 @@ class OpgeeService:
         return filtered_fields, stats
 
     @staticmethod
-    def _process_single_field(
-        field: PyxisFieldMeta,
-        start_date: date,
-        end_date: date,
-        db: Session,
-        field_flare_assignments: Dict[int, Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Process a single field to generate OPGEE input data.
-        
-        Args:
-            field: PyxisFieldMeta object
-            start_date: Start date for time range
-            end_date: End date for time range
-            db: Database session
-            field_flare_assignments: Dict mapping field_id to flare assignment results
-            
-        Returns:
-            Dict with OPGEE input data for the field, or None if no data
-        """
-        # Get all PyxisFieldData records for this field
-        field_data_records = db.query(PyxisFieldData).filter(
-            PyxisFieldData.pyxis_field_meta_id == field.id
-        ).all()
-        
-        if not field_data_records:
-            logger.warning(f"No field data found for field {field.id}")
-            # Still create entry with basic info and flare data
-            return OpgeeService._create_basic_field_entry(field, start_date, end_date, field_flare_assignments)
-        
-        # Merge all attributes using time-weighted processing
-        merged_attributes = merge_specific_attributes(
-            field_data_records=field_data_records,
-            attributes=OpgeeService._get_opgee_attributes(),
-            query_start=start_date,
-            query_end=end_date
-        )
-        
-        # Add pyxis_field_code at the beginning
-        result = {
-            'pyxis_field_code': field.pyxis_field_code
-        }
-        
-        # Add merged attributes
-        result.update(merged_attributes)
-        
-        # Calculate and add FOR (Flaring-to-Oil Ratio)
-        flare_volume = field_flare_assignments.get(field.id, {}).get('total_volume', 0.0)
-        for_value = OpgeeService._calculate_for(
-            flare_volume, 
-            merged_attributes.get('oil_prod', 0), 
-            start_date, 
-            end_date
-        )
-        result['for_value'] = for_value
-        
-        return result
-
-    @staticmethod
-    def _create_basic_field_entry(
-        field: PyxisFieldMeta,
-        start_date: date,
-        end_date: date,
-        field_flare_assignments: Dict[int, Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """
-        Create a basic field entry when no PyxisFieldData is available.
-        
-        Args:
-            field: PyxisFieldMeta object
-            start_date: Start date for time range
-            end_date: End date for time range
-            field_flare_assignments: Dict mapping field_id to flare assignment results
-            
-        Returns:
-            Dict with basic field info and calculated FOR
-        """
-        flare_volume = field_flare_assignments.get(field.id, {}).get('total_volume', 0.0)
-        for_value = OpgeeService._calculate_for(flare_volume, 0, start_date, end_date)
-        
-        return {
-            'pyxis_field_code': field.pyxis_field_code,
-            'for_value': for_value
-        }
-
-    @staticmethod
-    def _calculate_for(
-        flare_volume_bcm: float, 
-        oil_prod_bbl_per_day: Optional[float], 
-        start_date: date, 
-        end_date: date
-    ) -> float:
-        """
-        Calculate Flaring-to-Oil Ratio (FOR) in scf/bbl_oil.
-        
-        Args:
-            flare_volume_bcm: Flare volume in billion cubic meters
-            oil_prod_bbl_per_day: Oil production in barrels per day
-            start_date: Start date of period
-            end_date: End date of period
-            
-        Returns:
-            FOR value in scf/bbl_oil
-        """
-        if not oil_prod_bbl_per_day:
-            oil_prod_bbl_per_day = 1.0  # Use pseudo value to avoid division by zero
-        
-        # Calculate days in range
-        days_in_range = (end_date - start_date).days + 1
-        
-        # Convert BCM to SCF: 1 BCM = 35.3147 billion SCF
-        flare_volume_scf = flare_volume_bcm * 35.3147e9
-        
-        # Calculate total oil production over the period
-        total_oil_prod_bbl = oil_prod_bbl_per_day * days_in_range
-        
-        # Calculate FOR: scf_flare / bbl_oil
-        if total_oil_prod_bbl > 0:
-            for_value = flare_volume_scf / total_oil_prod_bbl
-        else:
-            for_value = 0.0
-        
-        return for_value
-
-    @staticmethod
-    def _get_opgee_attributes() -> List[str]:
-        """
-        Get list of all OPGEE-compatible attributes to merge in the order defined in rules.
-        
-        Returns:
-            List of attribute names in the order from OPGEE_cols_merge_rules.json
-        """
-        from app.utils.merge_utils import load_merge_rules
-        
-        merge_rules = load_merge_rules()
-        # Return attributes in the same order as defined in the JSON file
-        return list(merge_rules.keys())
-
-    @staticmethod
     def _generate_csv_output(
         opgee_data: List[Dict[str, Any]],
         output_path: str,
@@ -449,16 +484,7 @@ class OpgeeService:
         end_date: date
     ) -> str:
         """
-        Generate CSV file with OPGEE input data in the order of OPGEE rules.
-        
-        Args:
-            opgee_data: List of field data dictionaries
-            output_path: Path to save CSV file
-            start_date: Query start date
-            end_date: Query end date
-            
-        Returns:
-            Path to generated CSV file
+        Generate CSV file with OPGEE input data including calculated fields.
         """
         if not opgee_data:
             raise ValueError("No data to write to CSV")
@@ -466,9 +492,15 @@ class OpgeeService:
         # Ensure directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        # Get ordered column names: pyxis_field_code first, then OPGEE attributes in order
-        opgee_attributes = OpgeeService._get_opgee_attributes()
-        fieldnames = ['pyxis_field_code'] + opgee_attributes
+        # Get all possible column names from the data
+        all_columns = set()
+        for record in opgee_data:
+            all_columns.update(record.keys())
+        
+        # Ensure pyxis_field_code is first, then alphabetical order for others
+        fieldnames = ['pyxis_field_code']
+        other_columns = sorted([col for col in all_columns if col != 'pyxis_field_code'])
+        fieldnames.extend(other_columns)
         
         # Write CSV
         with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
@@ -481,4 +513,5 @@ class OpgeeService:
                 writer.writerow(complete_record)
         
         logger.info(f"Generated OPGEE CSV file: {output_path} with {len(opgee_data)} records")
+        logger.info(f"CSV columns: {fieldnames}")
         return output_path
