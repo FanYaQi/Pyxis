@@ -23,6 +23,7 @@ cartopy = "~=0.23.0"
 contextily = "~=1.6.1"
 matplotlib-venn = "~=1.1.1"
 tabulate = "*"
+netcdf4 = "*"
 
 [dev-packages]
 
