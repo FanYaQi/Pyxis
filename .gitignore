@@ -5,6 +5,8 @@
 # Files
 scripts_n_notebooks/data
 docs/legacy
+db/data
+
 
 # Sensitive Information
 .pyxis_pass
@@ -36,6 +38,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+CLAUDE.md
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

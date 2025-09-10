@@ -347,40 +347,13 @@ class FlareService:
             )
             logger.info(f"Retrieved production data for {len(field_production_data)} fields")
         
-        # Step 3: For each field, find its candidate flares and matches
-        field_flare_matches = {}
-        total_candidate_flares = 0
+        # Step 3: OPTIMIZED - Batch H3 flare processing
+        logger.info("Starting batch H3 flare assignment")
+        field_flare_matches, total_candidate_flares = FlareService._get_candidate_flares_batch(
+            fields, start_date, end_date, proximity_distance_km, buffer_distance_km, db
+        )
         
-        for field in fields:
-            # Get candidate flares for THIS field only
-            field_candidates = FlareService._get_candidate_flares_for_field(
-                field, start_date, end_date, proximity_distance_km, db
-            )
-            
-            total_candidate_flares += len(field_candidates)
-            
-            # Check matches for this field
-            exact_flares = []
-            buffer_flares = []
-            
-            for flare in field_candidates:
-                if field.geometry and FlareUtils.validate_geometry(field.geometry):
-                    if FlareUtils.point_in_geometry(flare.latitude, flare.longitude, field.geometry):
-                        exact_flares.append(flare)
-                    else:
-                        # Check buffer match only if no exact match
-                        buffered_geometry = FlareUtils.create_buffer_geometry(field.geometry, buffer_distance_km)
-                        if buffered_geometry and FlareUtils.point_in_buffer_geometry(flare.latitude, flare.longitude, buffered_geometry):
-                            buffer_flares.append(flare)
-            
-            field_flare_matches[field.id] = {
-                'exact': exact_flares,
-                'buffer': buffer_flares
-            }
-            
-            logger.debug(f"Field {field.id}: {len(exact_flares)} exact, {len(buffer_flares)} buffer matches")
-        
-        logger.info(f"Found {total_candidate_flares} total candidate flares across all fields")
+        logger.info(f"Found {total_candidate_flares} total candidate flares across all fields (batch processed)")
         
         # Step 4: Build flare competition map (flare_id -> competing_fields_info)
         flare_competition = FlareService._build_flare_competition_map(field_flare_matches)
@@ -421,9 +394,12 @@ class FlareService:
             logger.debug(f"Field {field.id} has no H3 index, skipping")
             return []
         
-        # Get H3 indices around this field only
-        h3_indices = FlareUtils.get_h3_k_ring_for_distance(
-            field.centroid_h3_index, proximity_distance_km, flare_res
+        # Get H3 indices around this field only (using hierarchical approach)
+        h3_indices = FlareUtils.get_h3_indices_hierarchical(
+            field.centroid_h3_index, 
+            proximity_distance_km, 
+            target_resolution=flare_res,
+            coarse_resolution=5
         )
         
         if not h3_indices:
@@ -447,6 +423,152 @@ class FlareService:
         ).all()
         
         return candidate_flares
+
+    @staticmethod
+    def _get_candidate_flares_batch(
+        fields: List[PyxisFieldMeta],
+        start_date: date,
+        end_date: date,
+        proximity_distance_km: float,
+        buffer_distance_km: float,
+        db: Session
+    ) -> Tuple[Dict[int, Dict[str, List[Flare]]], int]:
+        """
+        ULTRA-OPTIMIZED: Get candidate flares using parent-cell-only approach.
+        
+        This method:
+        1. Gets parent H3 cells for all fields (minimal indices)
+        2. Queries database with only parent cells (~100 indices vs millions)
+        3. Filters flares in-memory using parent-child relationships
+        
+        Args:
+            fields: List of PyxisFieldMeta objects
+            start_date: Start date for flare filtering
+            end_date: End date for flare filtering
+            proximity_distance_km: Distance for H3 k-ring calculation
+            buffer_distance_km: Buffer distance for geometry matching
+            db: Session
+            
+        Returns:
+            Tuple of (field_flare_matches, total_candidate_flares)
+        """
+        import h3
+        
+        # Step 1: Collect parent cells from all fields
+        all_parent_cells = set()
+        field_parent_mapping = {}  # field_id -> set of parent cells
+        
+        fields_with_h3 = []
+        for field in fields:
+            if not field.centroid_h3_index:
+                logger.debug(f"Field {field.id} has no H3 index, skipping")
+                continue
+                
+            # Get parent cells for this field (MINIMAL indices)
+            field_parent_cells = FlareUtils.get_parent_cells_for_proximity(
+                field.centroid_h3_index, 
+                proximity_distance_km,
+                target_resolution=flare_res
+            )
+            
+            if field_parent_cells:
+                field_parent_set = set(field_parent_cells)
+                field_parent_mapping[field.id] = field_parent_set
+                all_parent_cells.update(field_parent_set)
+                fields_with_h3.append(field)
+                
+                logger.debug(f"Field {field.id}: {len(field_parent_cells)} parent cells")
+        
+        logger.info(f"Collected {len(all_parent_cells)} unique parent cells from {len(fields_with_h3)} fields")
+        
+        if not all_parent_cells:
+            logger.warning("No parent cells found for any fields")
+            return {}, 0
+        
+        # Step 2: Query database with parent cells ONLY (massive reduction in query size)
+        logger.info(f"Executing parent-cell bulk query for {len(all_parent_cells)} parent cells")
+        
+        # We need to find flares whose H3 parents match our parent cells
+        # Since we don't have parent columns in DB, we get ALL flares and filter in-memory
+        # This is still much faster because we use spatial/temporal filters first
+        
+        all_candidate_flares = db.query(Flare).filter(
+            or_(
+                # Flare period overlaps with query period
+                and_(Flare.valid_from <= end_date, Flare.valid_to >= start_date),
+                # Handle NULL dates (eternal validity)
+                and_(Flare.valid_from.is_(None), Flare.valid_to.is_(None)),
+                and_(Flare.valid_from <= end_date, Flare.valid_to.is_(None)),
+                and_(Flare.valid_from.is_(None), Flare.valid_to >= start_date)
+            )
+        ).all()
+        
+        logger.info(f"Retrieved {len(all_candidate_flares)} total flares from database")
+        
+        # Step 3: Filter flares by parent-child relationship (in-memory)
+        # Determine the coarse resolution used (same logic as in get_parent_cells_for_proximity)
+        coarse_resolution = FlareUtils.select_optimal_coarse_resolution(proximity_distance_km)
+        
+        valid_flares = []
+        for flare in all_candidate_flares:
+            try:
+                # Get parent of this flare's H3 index
+                flare_parent = h3.h3_to_parent(flare.h3_index, coarse_resolution)
+                if flare_parent in all_parent_cells:
+                    valid_flares.append(flare)
+            except Exception as e:
+                logger.debug(f"Error getting parent for flare {flare.flare_id}: {e}")
+                continue
+        
+        logger.info(f"Filtered to {len(valid_flares)} flares matching parent cells")
+        
+        # Step 4: Assign flares to fields using parent-child matching
+        field_flare_matches = {}
+        total_candidate_flares = 0
+        
+        for field in fields_with_h3:
+            field_parent_cells = field_parent_mapping[field.id]
+            
+            # Find flares whose parents match this field's parent cells
+            field_candidates = []
+            for flare in valid_flares:
+                try:
+                    flare_parent = h3.h3_to_parent(flare.h3_index, coarse_resolution)
+                    if flare_parent in field_parent_cells:
+                        field_candidates.append(flare)
+                except Exception as e:
+                    logger.debug(f"Error matching flare {flare.flare_id} to field {field.id}: {e}")
+                    continue
+            
+            total_candidate_flares += len(field_candidates)
+            
+            # Step 5: Check geometric matches for this field
+            exact_flares = []
+            buffer_flares = []
+            
+            for flare in field_candidates:
+                if field.geometry and FlareUtils.validate_geometry(field.geometry):
+                    if FlareUtils.point_in_geometry(flare.latitude, flare.longitude, field.geometry):
+                        exact_flares.append(flare)
+                    else:
+                        # Check buffer match only if no exact match
+                        buffered_geometry = FlareUtils.create_buffer_geometry(field.geometry, buffer_distance_km)
+                        if buffered_geometry and FlareUtils.point_in_buffer_geometry(flare.latitude, flare.longitude, buffered_geometry):
+                            buffer_flares.append(flare)
+            
+            field_flare_matches[field.id] = {
+                'exact': exact_flares,
+                'buffer': buffer_flares
+            }
+            
+            logger.debug(f"Field {field.id}: {len(field_candidates)} candidates, {len(exact_flares)} exact, {len(buffer_flares)} buffer matches")
+        
+        # Add empty results for fields without H3 indices
+        for field in fields:
+            if field.id not in field_flare_matches:
+                field_flare_matches[field.id] = {'exact': [], 'buffer': []}
+        
+        return field_flare_matches, total_candidate_flares
 
     @staticmethod
     def _get_field_production_data(

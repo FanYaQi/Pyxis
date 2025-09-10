@@ -22,6 +22,62 @@ logger = logging.getLogger(__name__)
 
 class FlareUtils:
     """Utility class for flare-related spatial operations"""
+    
+    # H3 resolution edge lengths in kilometers
+    H3_EDGE_LENGTHS_KM = {
+        0: 1281.256011,
+        1: 483.0568391,
+        2: 182.5129565,
+        3: 68.97922179,
+        4: 26.07175968,
+        5: 9.854090990,
+        6: 3.724532667,
+        7: 1.406475763,
+        8: 0.531414010,
+        9: 0.200786148,
+        10: 0.075863783,
+        11: 0.028663897,
+        12: 0.010830188,
+        13: 0.004092010,
+        14: 0.001546100,
+        15: 0.000584169
+    }
+
+    @staticmethod
+    def select_optimal_coarse_resolution(proximity_distance_km: float) -> int:
+        """
+        Select optimal coarse resolution for parent-cell H3 approach.
+        
+        The coarse resolution should be smaller than proximity_distance_km but not too small.
+        We want the k-ring to be small (2-4 steps) for efficiency.
+        
+        Args:
+            proximity_distance_km: Proximity distance in kilometers
+            
+        Returns:
+            Optimal H3 resolution for parent cells
+        """
+        # Target: edge_length should be proximity_distance / 3 to 5
+        # This gives us a k-ring of 2-4 which is efficient
+        target_edge_length = proximity_distance_km / 4
+        
+        # Find the resolution with edge length closest to target
+        best_resolution = 3  # Default fallback
+        best_diff = float('inf')
+        
+        for resolution, edge_length in FlareUtils.H3_EDGE_LENGTHS_KM.items():
+            if resolution > 8:  # Don't go too fine for parent cells
+                break
+                
+            diff = abs(edge_length - target_edge_length)
+            if diff < best_diff and edge_length <= proximity_distance_km:
+                best_diff = diff
+                best_resolution = resolution
+        
+        logger.debug(f"Proximity {proximity_distance_km}km -> coarse resolution {best_resolution} "
+                    f"(edge: {FlareUtils.H3_EDGE_LENGTHS_KM[best_resolution]:.2f}km)")
+        
+        return best_resolution
 
     @staticmethod
     def get_h3_k_ring_for_distance(
@@ -54,6 +110,114 @@ class FlareUtils:
         except Exception as e:
             logger.error(f"Error calculating H3 k-ring for {center_h3}: {str(e)}")
             return [center_h3]  # Return at least the center if calculation fails
+
+    @staticmethod
+    def get_h3_indices_hierarchical(
+        center_h3: str, 
+        distance_km: float, 
+        target_resolution: int = 9,
+        coarse_resolution: int = 5
+    ) -> List[str]:
+        """
+        OPTIMIZED: Get H3 indices within distance using hierarchical approach.
+        
+        This method dramatically reduces the number of H3 indices by:
+        1. Using a coarser resolution for the k-ring calculation
+        2. Getting children of coarse hexagons at the target resolution
+        3. Avoiding massive k-rings at fine resolutions
+        
+        Args:
+            center_h3: Center H3 index at target resolution
+            distance_km: Distance in kilometers
+            target_resolution: Final resolution for returned indices (default: 9)
+            coarse_resolution: Coarse resolution for k-ring calculation (default: 6)
+            
+        Returns:
+            List of H3 indices at target_resolution within the distance
+        """
+        try:
+            # Convert center to coarse resolution
+            coarse_center = h3.h3_to_parent(center_h3, coarse_resolution)
+            
+            # Calculate k-ring at coarse resolution (much smaller k value)
+            coarse_edge_length_km = h3.edge_length(coarse_resolution, unit='km')
+            k_coarse = max(1, int(math.ceil(distance_km / coarse_edge_length_km)))
+            
+            logger.debug(f"Hierarchical H3: coarse_resolution={coarse_resolution}, k={k_coarse}, edge_length={coarse_edge_length_km:.2f}km")
+            
+            # Get k-ring at coarse resolution
+            coarse_indices = h3.k_ring(coarse_center, k_coarse)
+            
+            logger.debug(f"Hierarchical H3: {len(coarse_indices)} coarse hexagons")
+            
+            # Get all children at target resolution
+            fine_indices = []
+            for coarse_h3 in coarse_indices:
+                children = h3.h3_to_children(coarse_h3, target_resolution)
+                fine_indices.extend(children)
+            
+            logger.debug(f"Hierarchical H3: {len(fine_indices)} fine hexagons at resolution {target_resolution}")
+            
+            return fine_indices
+            
+        except Exception as e:
+            logger.error(f"Error in hierarchical H3 calculation for {center_h3}: {str(e)}")
+            # Fallback to original method with reasonable limits
+            return FlareUtils.get_h3_k_ring_for_distance(center_h3, min(distance_km, 50.0), target_resolution)
+
+    @staticmethod
+    def get_parent_cells_for_proximity(
+        center_h3: str, 
+        proximity_distance_km: float,
+        target_resolution: int = 9
+    ) -> List[str]:
+        """
+        ULTRA-OPTIMIZED: Get parent H3 cells for proximity search.
+        
+        This method:
+        1. Selects optimal coarse resolution dynamically
+        2. Returns only parent cells (not children)
+        3. Designed for database querying with minimal indices
+        
+        Args:
+            center_h3: Center H3 index at target resolution
+            proximity_distance_km: Proximity distance in kilometers
+            target_resolution: Original resolution of center_h3 (for parent conversion)
+            
+        Returns:
+            List of parent H3 cells at coarse resolution
+        """
+        try:
+            # Step 1: Select optimal coarse resolution
+            coarse_resolution = FlareUtils.select_optimal_coarse_resolution(proximity_distance_km)
+            
+            # Step 2: Convert center to coarse resolution
+            coarse_center = h3.h3_to_parent(center_h3, coarse_resolution)
+            
+            # Step 3: Calculate k-ring at coarse resolution
+            coarse_edge_length_km = FlareUtils.H3_EDGE_LENGTHS_KM[coarse_resolution]
+            k_coarse = max(1, int(math.ceil(proximity_distance_km / coarse_edge_length_km)))
+            
+            # Add small buffer to ensure coverage
+            k_coarse += 1
+            
+            # Step 4: Get k-ring at coarse resolution
+            parent_cells = list(h3.k_ring(coarse_center, k_coarse))
+            
+            logger.debug(f"Parent-cell approach: proximity={proximity_distance_km}km, "
+                        f"coarse_res={coarse_resolution}, k={k_coarse}, "
+                        f"parent_cells={len(parent_cells)}")
+            
+            return parent_cells
+            
+        except Exception as e:
+            logger.error(f"Error in parent-cell H3 calculation for {center_h3}: {str(e)}")
+            # Fallback: return small k-ring at resolution 3
+            try:
+                fallback_center = h3.h3_to_parent(center_h3, 3)
+                return list(h3.k_ring(fallback_center, 3))
+            except:
+                return [h3.h3_to_parent(center_h3, 3)]
 
     @staticmethod
     def point_in_geometry(lat: float, lon: float, geometry: WKBElement) -> bool:
