@@ -19,6 +19,9 @@ class OpgeeInputRequest(BaseModel):
     country: Optional[str] = Field(
         None, description="Optional country filter for fields"
     )
+    production_type: Optional[str] = Field(
+        None, description="Optional filter for fields by production type ('oil' or 'gas')"
+    )
     flare_config: FlareAssignmentConfig = Field(
         default_factory=FlareAssignmentConfig,
         description="Configuration for flare assignment"
@@ -52,6 +55,15 @@ class OpgeeInputStatistics(BaseModel):
     )
     total_flare_volume_assigned: float = Field(
         ..., description="Total flare volume assigned in BCM"
+    )
+    total_flaring_sum_scf: float = Field(
+        ..., description="Total flaring sum in standard cubic feet (production * FOR)"
+    )
+    total_flaring_sum_bcm: float = Field(
+        ..., description="Total flaring sum in billion cubic meters (production * FOR)"
+    )
+    production_type: str = Field(
+        ..., description="Production type processed ('oil', 'gas', or 'all')"
     )
     processing_time_seconds: float = Field(
         ..., description="Total processing time in seconds"

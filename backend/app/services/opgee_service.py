@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 import logfire
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.postgres.models.pyxis_field import PyxisFieldMeta, PyxisFieldData
 from app.postgres.models.data_entry import DataEntry
@@ -35,6 +36,7 @@ class OpgeeService:
         db: Session,
         field_ids: Optional[List[int]] = None,
         country: Optional[str] = None,
+        production_type: Optional[str] = None,
         flare_config: FlareAssignmentConfig = FlareAssignmentConfig(),
         csv_output_path: Optional[str] = None,
         require_multi_source_coverage: bool = True,
@@ -56,6 +58,7 @@ class OpgeeService:
             db: Database session
             field_ids: Optional list of specific field IDs
             country: Optional country filter for fields
+            production_type: Optional filter for fields by production type ("oil" or "gas")
             flare_config: Configuration for flare assignment
             csv_output_path: Optional path to save CSV file
             require_multi_source_coverage: Filter fields by source coverage
@@ -76,38 +79,127 @@ class OpgeeService:
         if start_date > end_date:
             raise ValueError("start_date must be before or equal to end_date")
         
-        logger.info(f"Starting OPGEE input generation for {start_date} to {end_date} (debug={debug_mode})")
+        if production_type is not None and production_type not in ["oil", "gas"]:
+            raise ValueError("production_type must be 'oil' or 'gas'")
+        
+        logger.info(f"Starting OPGEE input generation for {start_date} to {end_date} "
+                   f"(production_type={production_type}, debug={debug_mode})")
         
         # Step 1: Get target fields
         with logfire.span("Get target fields"):
-            fields = OpgeeService._get_target_fields(db, field_ids, country)
+            fields = OpgeeService._get_target_fields(db, field_ids, country, production_type)
             if not fields:
                 raise ValueError("No fields found matching the criteria")
             
-            logger.info(f"Found {len(fields)} initial fields")
+            logger.info(f"STEP 1 - Initial field retrieval:")
+            logger.info(f"  - Total fields found: {len(fields)}")
+            logger.info(f"  - Filters applied: field_ids={bool(field_ids)}, country={country}, production_type={production_type}")
+            
+            # Debug: Show functional_unit distribution for retrieved fields
+            if fields and debug_mode:
+                field_ids_for_debug = [f.id for f in fields]
+                functional_unit_dist = db.query(
+                    PyxisFieldData.functional_unit, 
+                    func.count(PyxisFieldData.pyxis_field_meta_id.distinct()).label('field_count')
+                ).filter(
+                    PyxisFieldData.pyxis_field_meta_id.in_(field_ids_for_debug)
+                ).group_by(PyxisFieldData.functional_unit).all()
+                
+                func_unit_dict = {row[0] or 'NULL': row[1] for row in functional_unit_dist}
+                logger.info(f"  - Functional unit distribution: {func_unit_dict}")
             
         # Step 2: Apply source coverage filter
         source_filter_stats = {}
+        fields_before_source_filter = len(fields)
+        
         if require_multi_source_coverage:
             with logfire.span("Filter fields by source coverage"):
+                logger.info(f"STEP 2 - Source coverage filtering:")
+                logger.info(f"  - Fields before filtering: {fields_before_source_filter}")
+                logger.info(f"  - Min coverage ratio: {min_source_coverage_ratio}")
+                logger.info(f"  - Trusted source types: {trusted_source_types}")
+                
                 fields, source_filter_stats = OpgeeService._filter_fields_by_source_coverage(
                     fields, db, min_source_coverage_ratio, trusted_source_types
                 )
+                
+                logger.info(f"  - Fields after filtering: {len(fields)}")
+                logger.info(f"  - Fields removed: {fields_before_source_filter - len(fields)}")
+                logger.info(f"  - Trusted exceptions: {source_filter_stats.get('trusted_exception_count', 0)}")
+                logger.info(f"  - Coverage passed: {source_filter_stats.get('coverage_passed_count', 0)}")
+                
                 if not fields:
                     raise ValueError("No fields remaining after source coverage filtering")
-                
-                logger.info(f"After source filtering: {len(fields)} fields remaining")
+        else:
+            logger.info(f"STEP 2 - Source coverage filtering SKIPPED (require_multi_source_coverage=False)")
+            source_filter_stats = {
+                'total_before_filtering': fields_before_source_filter,
+                'filtered_out_count': 0,
+                'trusted_exception_count': 0,
+                'coverage_passed_count': fields_before_source_filter,
+                'contributing_sources_count': 0
+            }
     
         # Step 3: NEW - Merge field data FIRST (before flare assignment)
         with logfire.span("Merge field data for filtered fields"):
+            logger.info(f"STEP 3 - Merging field data:")
+            logger.info(f"  - Fields to merge: {len(fields)}")
+            
             merged_field_data = OpgeeService._merge_field_data_for_fields(
                 fields, start_date, end_date, db, debug_mode
             )
             
-            logger.info(f"Merged data for {len(merged_field_data)} fields")
+            fields_with_merged_data = len(merged_field_data)
+            fields_without_data = len(fields) - fields_with_merged_data
+            
+            logger.info(f"  - Fields with merged data: {fields_with_merged_data}")
+            logger.info(f"  - Fields without data: {fields_without_data}")
+        
+        # Step 3.5: Filter out fields with zero/null oil production for oil fields
+        if production_type == "oil":
+            with logfire.span("Filter fields by oil production volume"):
+                logger.info(f"STEP 3.5 - Oil production filtering:")
+                
+                # Analyze oil production in merged data
+                fields_before_oil_filter = len(fields)
+                zero_oil_prod = 0
+                null_oil_prod = 0
+                positive_oil_prod = 0
+                
+                valid_field_ids = set()
+                for field_id, merged_data in merged_field_data.items():
+                    oil_prod = merged_data.get('oil_prod')
+                    
+                    if oil_prod is None:
+                        null_oil_prod += 1
+                    elif oil_prod <= 0:
+                        zero_oil_prod += 1
+                        logger.debug(f"Field {field_id}: oil_prod = {oil_prod} (filtered out)")
+                    else:
+                        positive_oil_prod += 1
+                        valid_field_ids.add(field_id)
+                
+                # Filter fields and merged data
+                fields = [f for f in fields if f.id in valid_field_ids]
+                merged_field_data = {fid: data for fid, data in merged_field_data.items() if fid in valid_field_ids}
+                
+                fields_after_oil_filter = len(fields)
+                fields_removed_oil = fields_before_oil_filter - fields_after_oil_filter
+                
+                logger.info(f"  - Fields before oil production filter: {fields_before_oil_filter}")
+                logger.info(f"  - Fields with positive oil_prod: {positive_oil_prod}")
+                logger.info(f"  - Fields with zero oil_prod: {zero_oil_prod}")
+                logger.info(f"  - Fields with null oil_prod: {null_oil_prod}")
+                logger.info(f"  - Fields after oil production filter: {fields_after_oil_filter}")
+                logger.info(f"  - Fields removed by oil production filter: {fields_removed_oil}")
         
         # Step 4: Assign flares using original field geometries
         with logfire.span("Assign flares to filtered fields"):
+            logger.info(f"STEP 4 - Flare assignment:")
+            logger.info(f"  - Fields for flare assignment: {len(fields)}")
+            logger.info(f"  - Proximity distance: {flare_config.proximity_distance_km}km")
+            logger.info(f"  - Buffer distance: {flare_config.buffer_distance_km}km")
+            
             flare_stats, field_flare_assignments, _ = FlareService.assign_flares_to_fields(
                 start_date=start_date,
                 end_date=end_date,
@@ -118,7 +210,12 @@ class OpgeeService:
                 allocation_strategy=flare_config.allocation_strategy.value  # Add this line
             )
             
-            logger.info(f"Flare assignment completed: {flare_stats['total_flares_assigned']} flares assigned")
+            total_flares_assigned = flare_stats.get('total_flares_assigned', 0)
+            fields_with_flares = len([f for f in field_flare_assignments.values() if f.get('total_volume', 0) > 0])
+            
+            logger.info(f"  - Total flares assigned: {total_flares_assigned}")
+            logger.info(f"  - Fields with flare assignments: {fields_with_flares}")
+            logger.info(f"  - Total flare volume assigned: {flare_stats.get('total_flare_volume_assigned', 0.0):.6f} BCM")
         
         # Step 5: Calculate FOR using merged oil_prod + assigned flare volumes
         with logfire.span("Calculate FOR from assignments and merged data"):
@@ -132,6 +229,27 @@ class OpgeeService:
             )
             
             logger.info(f"Calculated FOR for {len(for_values)} fields")
+        
+        # Step 5.5: Calculate total flaring sum (production * FOR)
+        with logfire.span("Calculate total flaring sum"):
+            total_flaring_sum = 0.0
+            days_in_range = (end_date - start_date).days + 1
+            
+            for field_id, for_value in for_values.items():
+                merged_data = merged_field_data.get(field_id, {})
+                oil_prod = merged_data.get('oil_prod', 1.0)  # Default to 1.0 if not found
+                
+                # Calculate total flaring: oil_prod (bbl/day) * days * FOR (scf/bbl) = total scf
+                if oil_prod and oil_prod > 0 and for_value > 0:
+                    field_flaring_scf = oil_prod * days_in_range * for_value
+                    total_flaring_sum += field_flaring_scf
+                    
+                    logger.debug(f"Field {field_id}: {oil_prod} bbl/day * {days_in_range} days * {for_value:.6f} scf/bbl = {field_flaring_scf:.2f} scf")
+            
+            # Convert to more readable units (BCM - billion cubic meters)
+            total_flaring_bcm = total_flaring_sum / 35.3147e9  # 1 BCM = 35.3147 billion SCF
+            
+            logger.info(f"Total flaring calculated: {total_flaring_sum:.2f} SCF ({total_flaring_bcm:.6f} BCM)")
         
         # Step 6: Generate final OPGEE data combining merged attributes + FOR
         with logfire.span("Generate final OPGEE data"):
@@ -169,6 +287,9 @@ class OpgeeService:
             'fields_with_data': fields_with_data,
             'fields_with_flare_assignment': fields_with_flare,
             'total_flare_volume_assigned': flare_stats.get('total_flare_volume_assigned', 0.0),
+            'total_flaring_sum_scf': round(total_flaring_sum, 2),
+            'total_flaring_sum_bcm': round(total_flaring_bcm, 6),
+            'production_type': production_type or "all",
             'processing_time_seconds': processing_time,
             'fields_with_exact_flare_matches': flare_stats.get('fields_with_exact_matches', 0),
             'fields_with_buffer_flare_matches': flare_stats.get('fields_with_buffer_matches', 0),
@@ -185,6 +306,19 @@ class OpgeeService:
             })
         
         logger.info(f"OPGEE input generation completed in {processing_time:.2f} seconds")
+        production_type_label = production_type or "all"
+        
+        # Calculate total fields filtered out
+        initial_fields = source_filter_stats.get('total_before_filtering', len(fields))
+        total_filtered_out = initial_fields - len(fields)
+        
+        logger.info(f"FINAL SUMMARY:")
+        logger.info(f"  - Initial fields: {initial_fields}")
+        logger.info(f"  - Final fields processed: {len(fields)} ({production_type_label})")
+        logger.info(f"  - Total filtered out: {total_filtered_out}")
+        logger.info(f"  - Fields with flare assignments: {fields_with_flare}")
+        logger.info(f"  - Total flaring: {total_flaring_bcm:.6f} BCM")
+        logger.info(f"  - Processing time: {processing_time:.2f} seconds")
         
         return statistics, csv_file_path
 
@@ -335,21 +469,44 @@ class OpgeeService:
     def _get_target_fields(
         db: Session,
         field_ids: Optional[List[int]] = None,
-        country: Optional[str] = None
+        country: Optional[str] = None,
+        production_type: Optional[str] = None
     ) -> List[PyxisFieldMeta]:
         """
-        Get target fields based on field_ids or country.
+        Get target fields based on field_ids, country, and production type.
         
         Args:
             db: Database session
             field_ids: Optional list of field IDs
             country: Optional country filter
+            production_type: Optional production type filter ("oil" or "gas")
             
         Returns:
             List of PyxisFieldMeta objects
         """
+        base_query = db.query(PyxisFieldMeta)
+        
+        # Apply production type filter if specified
+        if production_type:
+            # Use subquery approach to avoid join issues
+            logger.info(f"Applying production type filter: {production_type}")
+            
+            # Get field IDs that have records with the desired functional_unit
+            field_ids_with_type = db.query(PyxisFieldData.pyxis_field_meta_id).filter(
+                PyxisFieldData.functional_unit == production_type
+            ).distinct().all()
+            
+            field_ids_list = [row[0] for row in field_ids_with_type]
+            logger.info(f"Found {len(field_ids_list)} fields with functional_unit='{production_type}'")
+            
+            if not field_ids_list:
+                logger.warning(f"No fields found with functional_unit='{production_type}'")
+                return []
+            
+            base_query = base_query.filter(PyxisFieldMeta.id.in_(field_ids_list))
+        
         if field_ids:
-            fields = db.query(PyxisFieldMeta).filter(
+            fields = base_query.filter(
                 PyxisFieldMeta.id.in_(field_ids)
             ).all()
             if len(fields) != len(field_ids):
@@ -358,7 +515,7 @@ class OpgeeService:
                 logger.warning(f"Some field IDs not found: {missing_ids}")
             return fields
         elif country:
-            return db.query(PyxisFieldMeta).filter(
+            return base_query.filter(
                 PyxisFieldMeta.country == country
             ).all()
         else:
@@ -386,7 +543,9 @@ class OpgeeService:
         if not fields:
             return [], {}
         
-        logger.info(f"Applying source coverage filter to {len(fields)} fields")
+        logger.info(f"SOURCE COVERAGE FILTER - Starting with {len(fields)} fields")
+        logger.info(f"  - Min coverage ratio: {min_coverage_ratio}")
+        logger.info(f"  - Trusted source types: {trusted_source_types}")
         
         # Batch query: Get all field-to-source mappings at once
         field_source_mapping = db.query(
@@ -405,7 +564,8 @@ class OpgeeService:
         contributing_source_ids = set(mapping.source_id for mapping in field_source_mapping)
         total_contributing_sources = len(contributing_source_ids)
         
-        logger.info(f"Found {total_contributing_sources} sources contributing field data")
+        logger.info(f"  - Found {total_contributing_sources} sources contributing field data")
+        logger.info(f"  - Total field-source mappings: {len(field_source_mapping)}")
         
         if total_contributing_sources == 0:
             logger.warning("No sources found contributing field data")

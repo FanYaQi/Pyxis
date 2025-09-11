@@ -25,7 +25,7 @@ async def generate_opgee_input(
     Generate OPGEE-compatible input data by merging field data and flare assignments.
     
     This endpoint:
-    1. Retrieves fields based on field_ids or country filter
+    1. Retrieves fields based on field_ids, country, and/or production_type filters
     2. Assigns flares to fields using spatial and temporal criteria
     3. Merges field attributes using time-weighted processing for dynamic attributes
     4. Calculates Flaring-to-Oil Ratio (FOR) from flare volumes and oil production
@@ -56,6 +56,12 @@ async def generate_opgee_input(
                 detail="start_date must be before or equal to end_date"
             )
         
+        if request.production_type is not None and request.production_type not in ["oil", "gas"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="production_type must be 'oil' or 'gas'"
+            )
+        
         logger.info(
             f"User {current_user.email} requested OPGEE input generation for "
             f"{request.start_date} to {request.end_date}"
@@ -68,6 +74,7 @@ async def generate_opgee_input(
             db=db,
             field_ids=request.field_ids,
             country=request.country,
+            production_type=request.production_type,
             flare_config=request.flare_config,
             csv_output_path=request.csv_output_path,
             require_multi_source_coverage=request.require_multi_source_coverage,

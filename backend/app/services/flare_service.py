@@ -578,22 +578,42 @@ class FlareService:
         db: Session
     ) -> Dict[int, float]:
         """
-        Get oil production data for fields using merge utilities.
+        OPTIMIZED: Get oil production data for fields using batch query.
+        
+        Replaces N individual field queries with 1 bulk query + in-memory grouping.
         """
         from app.utils.merge_utils import merge_specific_attributes
+        from collections import defaultdict
         
+        field_ids = [field.id for field in fields]
+        
+        # BATCH QUERY: Get all production data for all fields in one query
+        logger.info(f"Batch querying production data for {len(field_ids)} fields")
+        
+        all_field_data = db.query(PyxisFieldData).filter(
+            and_(
+                PyxisFieldData.pyxis_field_meta_id.in_(field_ids),
+                PyxisFieldData.oil_prod.is_not(None)  # Only records with production data
+            )
+        ).all()
+        
+        logger.info(f"Retrieved {len(all_field_data)} production records from database")
+        
+        # GROUP BY field_id for batch processing
+        field_data_groups = defaultdict(list)
+        for record in all_field_data:
+            field_data_groups[record.pyxis_field_meta_id].append(record)
+        
+        # Process each field's production data
         field_production_data = {}
         
         for field in fields:
-            # Get all PyxisFieldData records for this field
-            field_data_records = db.query(PyxisFieldData).filter(
-                PyxisFieldData.pyxis_field_meta_id == field.id
-            ).all()
+            field_records = field_data_groups.get(field.id, [])
             
-            if field_data_records:
+            if field_records:
                 # Merge oil_prod attribute for time range
                 merged_attributes = merge_specific_attributes(
-                    field_data_records=field_data_records,
+                    field_data_records=field_records,
                     attributes=['oil_prod'],
                     query_start=start_date,
                     query_end=end_date
@@ -604,11 +624,12 @@ class FlareService:
                     field_production_data[field.id] = float(oil_prod)
                 else:
                     field_production_data[field.id] = 1.0  # Default value
-                    logger.debug(f"Field {field.id}: Using default oil_prod=1.0")
+                    logger.debug(f"Field {field.id}: Using default oil_prod=1.0 (oil_prod was {oil_prod})")
             else:
                 field_production_data[field.id] = 1.0  # Default value
-                logger.debug(f"Field {field.id}: No data records, using default oil_prod=1.0")
+                logger.debug(f"Field {field.id}: No production records, using default oil_prod=1.0")
         
+        logger.info(f"Processed production data for {len(field_production_data)} fields")
         return field_production_data
 
     @staticmethod

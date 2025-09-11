@@ -382,11 +382,13 @@ def process_attribute(field_data_records, attr_name: str, rule: Dict,
             if len(attr_values) == len(oil_prod_values):
                 result = merge_volume_weighted_average(attr_values, oil_prod_values)
             else:
-                logger.warning(f"Mismatched lengths for volume weighted average: {attr_name}")
+                logger.debug(f"Mismatched lengths for volume weighted average: {attr_name} "
+                           f"(attr_values={len(attr_values)}, oil_prod_values={len(oil_prod_values)}), "
+                           f"falling back to time-weighted average")
                 result = time_weighted_average(attr_pairs) if attr_pairs else None
         else:
             # Fallback to regular average if no oil_prod data
-            logger.warning(f"No oil_prod data for volume weighting {attr_name}, using regular average")
+            logger.debug(f"No oil_prod data for volume weighting {attr_name}, using regular average")
             values = extract_values_for_attribute(field_data_records, attr_name)
             result = merge_average(values)
             
