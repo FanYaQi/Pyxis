@@ -7,12 +7,13 @@ import h3
 import geopandas as gpd
 import uuid
 from unidecode import unidecode
+from datetime import datetime
 
 ##note: give output for the source metadata table and source info table
 m3toscf = 35.31466657
 boe2tm3 = 0.1647  # boe natural gas to thousand m3
 
-with open("./db/data/OPGEE_cols.json", "r") as json_file:
+with open("./data/OPGEE_cols.json", "r") as json_file:
     OPGEE_cols = json.load(json_file)
 
 
@@ -127,7 +128,7 @@ def process_calwir(water_in, oil):
 
 
 def process_calglr(lift, oil):
-    # Gas lifting injection ratio （scf/bbl liquid
+    # Gas lifting injection ratio ï¼ˆscf/bbl liquid
     if lift is not None and oil is not None and oil != 0:
         return lift * 1000 * m3toscf / oil
 
@@ -176,7 +177,10 @@ def process_pcg(inject, produce, receive, consume, transfer, flare):
 
 def process_pcw(inject, prod):
     if inject is not None and prod is not None and prod != 0:
-        return inject / prod
+        if inject > prod:
+            return 1
+        else:
+            return inject / prod
 
 
 ###for gogi
@@ -237,7 +241,7 @@ op_table = {
         "Natural gas reinjection": (["Gas In 2nd"], process_bin),
         "Gas lifting": (["Gas Lift ("], process_bin),
         "Steam flooding": (["Steam Inje"], process_bin),
-        "Gas flooding": (["CO₂ Inje", "Nitrogen I"], process_bin_2),
+        "Gas flooding": (["COâ‚‚ Inje", "Nitrogen I"], process_bin_2),
         "Field age": (["Field age"], process_keep),
         "Field depth": (["Field dept"], process_mtr2ft),
         "Number of producing wells": (["no. Produc"], process_round),
@@ -252,10 +256,10 @@ op_table = {
         "Water injection ratio": (["Water In 2", "Oil (bbl/d"], process_calwir),
         "Gas lifting injection ratio": (["Gas Lift (", "Oil (bbl/d"], process_calglr),
         "Gas flooding injection ratio": (
-            ["Gas In 2nd", "CO₂ Inje", "Nitrogen I", "Oil (bbl/d"],
+            ["Gas In 2nd", "COâ‚‚ Inje", "Nitrogen I", "Oil (bbl/d"],
             process_calgfr,
         ),
-        "Flood gas": (["Gas In 2nd", "CO₂ Inje", "Nitrogen I"], process_fg),
+        "Flood gas": (["Gas In 2nd", "COâ‚‚ Inje", "Nitrogen I"], process_fg),
         "Steam-to-oil ratio (SOR)": (["Steam Inje", "Oil (bbl/d"], process_calsor),
         "Fraction of remaining natural gas reinjected": (
             [
@@ -283,6 +287,49 @@ op_table = {
 }
 
 
+def filter_columns_with_data(df, threshold=0.95):
+    """
+    Filter out columns that have mostly null/empty data.
+    
+    Args:
+        df: DataFrame to filter
+        threshold: Minimum fraction of non-null values required to keep column
+    
+    Returns:
+        List of column names to keep
+    """
+    keep_cols = []
+    for col in df.columns:
+        if col in ['Field ID', 'Name', 'Centroid H3 Index', 'Source ID', 'geometry']:
+            # Always keep these essential columns
+            keep_cols.append(col)
+        else:
+            # Check if column has sufficient non-null data
+            non_null_ratio = df[col].notna().sum() / len(df)
+            if non_null_ratio >= (1 - threshold):  # Keep if less than threshold% are null
+                keep_cols.append(col)
+    
+    return keep_cols
+
+
+def add_time_columns(df, start_date="2021-1-1", end_date="2021-12-31"):
+    """
+    Add start_date and end_date columns to the dataframe.
+    
+    Args:
+        df: DataFrame to modify
+        start_date: Start date string (default: "2021-1-1")
+        end_date: End date string (default: "2021-12-31")
+    
+    Returns:
+        Modified DataFrame with time columns
+    """
+    df = df.copy()
+    df.insert(2, 'start_date', start_date)  # Insert after Field ID
+    df.insert(3, 'end_date', end_date)      # Insert after start_date
+    return df
+
+
 ##define class for all datasource and process it to OPGEE cols
 class DataSource(ABC):
     """Abstract Base Class for data sources."""
@@ -299,6 +346,10 @@ class DataSource(ABC):
         target_schema=OPGEE_cols,
         description="",
         h3_res=9,
+        filter_empty_cols=False,
+        data_threshold=0.95,
+        start_date="2021-1-1",
+        end_date="2021-12-31"
     ):
         super().__init__()
         self.data = data
@@ -312,6 +363,10 @@ class DataSource(ABC):
         self.target_schema = target_schema
         self.description = description
         self.h3_res = h3_res
+        self.filter_empty_cols = filter_empty_cols
+        self.data_threshold = data_threshold
+        self.start_date = start_date
+        self.end_date = end_date
         self.data_score_avg = None
         # self.source_id = str(uuid.uuid4())
         self.source_id = str(name) + str(time)
@@ -369,14 +424,28 @@ class DataSource(ABC):
             self.processed_data.append(processed_row)
 
     def source_info_table(self):
-        """Convert processed data back to DataFrame."""
+        """Convert processed data back to DataFrame with time columns."""
         source_info = pd.DataFrame(self.processed_data)
+        
         # List the first few columns you want at the front
         new_order = ["Field ID", "Name", "Centroid H3 Index", "Source ID"]
         # Add the rest of the columns that are not included in the new_order list
         new_order += [col for col in source_info.columns if col not in new_order]
         # Rearrange the DataFrame according to new_order
         source_info = source_info[new_order]
+        
+        # Only filter out columns with mostly empty data if explicitly enabled
+        if self.filter_empty_cols:
+            keep_cols = filter_columns_with_data(source_info, self.data_threshold)
+            source_info = source_info[keep_cols]
+        
+        # Add time columns
+        source_info = add_time_columns(source_info, self.start_date, self.end_date)
+        
+        # Add index column at the beginning
+        source_info.reset_index(drop=True, inplace=True)
+        source_info.insert(0, 'Unnamed: 0', source_info.index)
+        
         return source_info
 
     def data_score(
@@ -393,9 +462,16 @@ class DataSource(ABC):
 
 
 def main():
-    # Initialize WMDataSource with data and operations configuration
+    # Configure time periods for each data source
+    time_configs = {
+        "zhan": {"start_date": "2021-1-1", "end_date": "2021-12-31"},
+        "wm": {"start_date": "2021-1-1", "end_date": "2021-12-31"},
+        "anp": {"start_date": "2021-1-1", "end_date": "2021-12-31"},
+        "gogi": {"start_date": "2021-1-1", "end_date": "2021-12-31"},
+    }
 
-    zhan_data = gpd.read_file("./db/data/br_geodata/br_zhan/BR.shp")
+    # Initialize zhan data source
+    zhan_data = gpd.read_file("./data/br_geodata/br_zhan/BR.shp")
     zhan = DataSource(
         data=zhan_data,
         name="zhan",
@@ -404,14 +480,17 @@ def main():
         time="2021",
         url="https://iopscience.iop.org/article/10.1088/1748-9326/ac3956/meta",
         config=op_table["zhan"],
+        start_date=time_configs["zhan"]["start_date"],
+        end_date=time_configs["zhan"]["end_date"],
     )
     zhan.process()
     zhan_source_table = zhan.source_info_table()
     zhan.data_score([5, 4, 3])
     print(zhan.metadata)
-    zhan_source_table.to_csv("./db/data/br_geodata/data_standardization/zhan.csv")
+    zhan_source_table.to_csv("./data/br_geodata/data_standardization/zhan.csv", index=False)
 
-    wm_data = gpd.read_file("./db/data/br_geodata/wm/BR_remove_outlier.shp")
+    # Initialize wm data source
+    wm_data = gpd.read_file("./data/br_geodata/wm/BR_remove_outlier.shp")
     wm = DataSource(
         data=wm_data,
         name="wm",
@@ -420,14 +499,17 @@ def main():
         time="2022",
         url="Not open source",
         config=op_table["wm"],
+        start_date=time_configs["wm"]["start_date"],
+        end_date=time_configs["wm"]["end_date"],
     )
     wm.process()
     wm_source_table = wm.source_info_table()
     wm.data_score([4, 5, 5])
     print(wm.metadata)
-    wm_source_table.to_csv("./db/data/br_geodata/data_standardization/wm.csv")
+    wm_source_table.to_csv("./data/br_geodata/data_standardization/wm.csv", index=False)
 
-    anp_data = gpd.read_file("./db/data/br_geodata/anp/raw/combined_anp_data.shp")
+    # Initialize anp data source
+    anp_data = gpd.read_file("./data/br_geodata/anp/raw/combined_anp_data.shp")
     anp = DataSource(
         data=anp_data,
         name="anp",
@@ -436,14 +518,17 @@ def main():
         time="2024",
         url="https://www.gov.br/anp/pt-br/assuntos/exploracao-e-producao-de-oleo-e-gas/dados-tecnicos",
         config=op_table["anp"],
+        start_date=time_configs["anp"]["start_date"],
+        end_date=time_configs["anp"]["end_date"],
     )
     anp.process()
     anp_source_table = anp.source_info_table()
     anp.data_score([4.5, 5, 5])
     print(anp.metadata)
-    anp_source_table.to_csv("./db/data/br_geodata/data_standardization/anp.csv")
+    anp_source_table.to_csv("./data/br_geodata/data_standardization/anp.csv", index=False)
 
-    gogi_data = gpd.read_file("./db/data/br_geodata/gogi/BR.shp")
+    # Initialize gogi data source
+    gogi_data = gpd.read_file("./data/br_geodata/gogi/BR.shp")
     gogi = DataSource(
         data=gogi_data,
         name="gogi",
@@ -452,18 +537,21 @@ def main():
         time="2023",
         url="https://edx.netl.doe.gov/dataset/global-oil-gas-features-database",
         config=op_table["gogi"],
+        start_date=time_configs["gogi"]["start_date"],
+        end_date=time_configs["gogi"]["end_date"],
     )
     gogi.process()
     gogi_source_table = gogi.source_info_table()
     gogi.data_score([4.5, 5, 3])  # source/ recency/ coverage score
     print(gogi.metadata)
-    gogi_source_table.to_csv("./db/data/br_geodata/data_standardization/gogi.csv")
+    gogi_source_table.to_csv("./data/br_geodata/data_standardization/gogi.csv", index=False)
 
+    # Create source metadata table
     source_metadata = pd.DataFrame(
         [zhan.metadata, wm.metadata, anp.metadata, gogi.metadata]
     )
     source_metadata.to_csv(
-        "./db/data/br_geodata/data_standardization/source_metadata.csv"
+        "./data/br_geodata/data_standardization/source_metadata.csv", index=False
     )
 
 

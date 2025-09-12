@@ -24,6 +24,115 @@ from app.utils.path_util import get_data_path
 
 logger = logging.getLogger(__name__)
 
+# OPGEE Field-level attribute types from attributes.xml
+OPGEE_FIELD_ATTRIBUTES = {
+    # Production methods
+    'downhole_pump': 'int',
+    'water_reinjection': 'int', 
+    'natural_gas_reinjection': 'int',
+    'gas_lifting': 'int',
+    'water_flooding': 'int',
+    'gas_flooding': 'int', 
+    'steam_flooding': 'int',
+    
+    # Field properties
+    'country': 'str',
+    'name': 'str',
+    'age': 'float',
+    'depth': 'float',
+    'oil_prod': 'float',
+    'num_prod_wells': 'int',
+    'num_water_inj_wells': 'int',
+    'num_gas_inj_wells': 'int',
+    'well_diam': 'float',
+    'prod_index': 'float',
+    'res_press': 'float',
+    'res_temp': 'float',
+    'wellhead_temperature': 'float',
+    'wellhead_pressure': 'float',
+    'offshore': 'int',
+    
+    # Fluid properties
+    'API': 'float',
+    'total_dissolved_solids': 'float',
+    'gas_comp_N2': 'float',
+    'gas_comp_CO2': 'float', 
+    'gas_comp_C1': 'float',
+    'gas_comp_C2': 'float',
+    'gas_comp_C3': 'float',
+    'gas_comp_C4': 'float',
+    'gas_comp_H2S': 'float',
+    
+    # Production practices
+    'GOR': 'float',
+    'WOR': 'float',
+    'WIR': 'float',
+    'GLIR': 'float',
+    'GFIR': 'float',
+    'SOR': 'float',
+    'fraction_elec_onsite': 'float',
+    'fraction_remaining_gas_inj': 'float',
+    'fraction_water_reinjected': 'float',
+    'fraction_steam_cogen': 'float',
+    'fraction_steam_solar': 'float',
+    
+    # Processing practices
+    'upgrader_type': 'str',
+    'gas_processing_path': 'str',
+    'common_gas_process_choice': 'str',
+    'oil_processing_path': 'str',
+    'FOR': 'float',
+    'frac_venting': 'float',
+    'stabilizer_column': 'int',
+    
+    # Transportation parameters  
+    'frac_transport_tanker': 'float',
+    'frac_transport_barge': 'float',
+    'frac_transport_pipeline': 'float',
+    'frac_transport_rail': 'float',
+    'frac_transport_truck': 'float',
+    'transport_dist_tanker': 'float',
+    'transport_dist_barge': 'float',
+    'transport_dist_pipeline': 'float', 
+    'transport_dist_rail': 'float',
+    'transport_dist_truck': 'float',
+    
+    # Land use impacts
+    'ecosystem_richness': 'str',
+    'field_development_intensity': 'str',
+    
+    # Special processing attributes
+    'oil_sands_mine': 'str',
+    'flood_gas_type': 'str',
+    'frac_CO2_breakthrough': 'float',
+    
+    # Heavy oil dilution
+    'HeavyOilDilution.fraction_diluent': 'float',
+    
+    # Crude oil dewatering
+    'CrudeOilDewatering.heater_treater': 'int'
+}
+
+# Mapping from Pyxis attribute names to OPGEE attribute names
+PYXIS_TO_OPGEE_MAPPING = {
+    'api': 'API',
+    'gor': 'GOR',
+    'wor': 'WOR',
+    'wir': 'WIR',
+    'sor': 'SOR',
+    'for_value': 'FOR',  # Calculated flare-to-oil ratio
+    'country': 'country',
+    'oil_prod': 'oil_prod',
+    'field_age': 'age',
+    'field_depth': 'depth',
+    'num_producing_wells': 'num_prod_wells',
+    'num_water_injection_wells': 'num_water_inj_wells',
+    'reservoir_pressure': 'res_press',
+    'reservoir_temperature': 'res_temp',
+    'productivity_index': 'prod_index',
+    'well_diameter': 'well_diam'
+}
+
 
 class OpgeeService:
     """Service for generating OPGEE input data with improved flow"""
@@ -644,7 +753,12 @@ class OpgeeService:
         end_date: date
     ) -> str:
         """
-        Generate CSV file with OPGEE input data including calculated fields.
+        Generate OPGEE csv2xml compatible CSV file.
+        
+        Format: 
+        - Column 1: python_name (attribute names)
+        - Column 2: Type (data types)
+        - Columns 3+: Field 1, Field 2, ... (field data)
         """
         if not opgee_data:
             raise ValueError("No data to write to CSV")
@@ -652,26 +766,80 @@ class OpgeeService:
         # Ensure directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        # Get all possible column names from the data
-        all_columns = set()
-        for record in opgee_data:
-            all_columns.update(record.keys())
+        logger.info(f"Generating OPGEE csv2xml format with {len(opgee_data)} fields")
         
-        # Ensure pyxis_field_code is first, then alphabetical order for others
-        fieldnames = ['pyxis_field_code']
-        other_columns = sorted([col for col in all_columns if col != 'pyxis_field_code'])
-        fieldnames.extend(other_columns)
-        
-        # Write CSV
-        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        # Step 1: Map Pyxis attributes to OPGEE attributes and collect data
+        mapped_data = []
+        for i, record in enumerate(opgee_data):
+            mapped_record = {}
             
-            for record in opgee_data:
-                # Ensure all fields have values (fill with empty string if missing)
-                complete_record = {field: record.get(field, '') for field in fieldnames}
-                writer.writerow(complete_record)
+            # Use sequential naming (Field 1, Field 2, etc.) as required by OPGEE
+            field_name = f"Field {i + 1}"
+            
+            # Optionally include pyxis_field_code in debug logging
+            pyxis_code = record.get('pyxis_field_code', f'Unknown_{i+1}')
+            logger.debug(f"Processing {field_name} (Pyxis: {pyxis_code})")
+            
+            # Map and convert Pyxis attributes to OPGEE format
+            for pyxis_attr, value in record.items():
+                # Skip pyxis_field_code as it's not an OPGEE attribute
+                if pyxis_attr == 'pyxis_field_code':
+                    continue
+                
+                # Map Pyxis attribute name to OPGEE attribute name
+                opgee_attr = PYXIS_TO_OPGEE_MAPPING.get(pyxis_attr, pyxis_attr)
+                
+                # Only include if it's a recognized OPGEE attribute
+                if opgee_attr in OPGEE_FIELD_ATTRIBUTES:
+                    # Convert boolean to int (True/False to 1/0)
+                    if isinstance(value, bool):
+                        value = 1 if value else 0
+                    
+                    mapped_record[opgee_attr] = value
+            
+            mapped_data.append({
+                'field_name': field_name,
+                'data': mapped_record
+            })
         
-        logger.info(f"Generated OPGEE CSV file: {output_path} with {len(opgee_data)} records")
-        logger.info(f"CSV columns: {fieldnames}")
+        # Step 2: Collect all unique attributes that have data
+        attributes_with_data = set()
+        for field_record in mapped_data:
+            attributes_with_data.update(field_record['data'].keys())
+        
+        # Step 3: Filter to only include attributes that exist in OPGEE and have data
+        valid_attributes = [attr for attr in sorted(attributes_with_data) if attr in OPGEE_FIELD_ATTRIBUTES]
+        
+        logger.info(f"Including {len(valid_attributes)} OPGEE attributes with data")
+        logger.debug(f"Attributes: {valid_attributes}")
+        
+        # Step 4: Create CSV headers
+        field_headers = ['python_name', 'Type'] + [field['field_name'] for field in mapped_data]
+        
+        # Step 5: Write OPGEE csv2xml format
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            # Write header row
+            writer.writerow(field_headers)
+            
+            # Write each attribute as a row
+            for attr_name in valid_attributes:
+                attr_type = OPGEE_FIELD_ATTRIBUTES[attr_name]
+                row = [attr_name, attr_type]
+                
+                # Add data for each field
+                for field_record in mapped_data:
+                    value = field_record['data'].get(attr_name, '')
+                    # Convert None to empty string
+                    if value is None:
+                        value = ''
+                    row.append(str(value))
+                
+                writer.writerow(row)
+        
+        logger.info(f"Generated OPGEE csv2xml file: {output_path}")
+        logger.info(f"Format: {len(valid_attributes)} attributes × {len(mapped_data)} fields")
+        logger.info(f"Attributes included: {', '.join(valid_attributes[:10])}{'...' if len(valid_attributes) > 10 else ''}")
+        
         return output_path
