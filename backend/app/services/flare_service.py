@@ -361,7 +361,8 @@ class FlareService:
         
         # Step 5: Apply allocation strategy
         field_assignments, stats = FlareService._allocate_by_competition(
-            flare_competition, allocation_strategy_enum, field_production_data, fields
+            flare_competition, allocation_strategy_enum, field_production_data, fields,
+            start_date, end_date
         )
         
         # Step 6: Finalize statistics
@@ -665,12 +666,51 @@ class FlareService:
         
         return flare_competition
 
+    @staticmethod
+    def _calculate_time_proportioned_volume(
+        flare_volume: float,
+        flare_valid_from: Optional[date],
+        flare_valid_to: Optional[date],
+        query_start: date,
+        query_end: date
+    ) -> float:
+        """
+        Calculate time-proportioned flare volume based on overlap with query period.
+        Uses the same logic as merge_utils.calculate_time_overlap_days.
+        """
+        from app.utils.merge_utils import calculate_time_overlap_days
+        
+        # Calculate total flare validity period in days
+        flare_start = flare_valid_from if flare_valid_from is not None else query_start
+        flare_end = flare_valid_to if flare_valid_to is not None else query_end
+        total_flare_days = (flare_end - flare_start).days + 1
+        
+        # Calculate overlap with query period
+        overlap_days = calculate_time_overlap_days(
+            flare_valid_from, flare_valid_to, query_start, query_end
+        )
+        
+        if overlap_days <= 0 or total_flare_days <= 0:
+            return 0.0
+        
+        # Return proportioned volume
+        proportion = overlap_days / total_flare_days
+        proportioned_volume = flare_volume * proportion
+        
+        logger.debug(
+            f"Time proportioned flare volume: {flare_volume:.6f} BCM × ({overlap_days}/{total_flare_days}) = {proportioned_volume:.6f} BCM"
+        )
+        
+        return proportioned_volume
+
     @staticmethod 
     def _allocate_by_competition(
         flare_competition: Dict[str, Dict],
         allocation_strategy: 'FlareAllocationStrategy',
         field_production_data: Dict[int, float],
-        fields: List[PyxisFieldMeta]
+        fields: List[PyxisFieldMeta],
+        start_date: date,
+        end_date: date
     ) -> Tuple[Dict[int, Dict[str, Any]], Dict[str, Any]]:
         """
         Allocate flares based on competition rules and allocation strategy.
@@ -698,7 +738,8 @@ class FlareService:
             'fields_with_buffer_matches': 0,
             'fields_with_no_matches': 0,
             'total_flare_volume_assigned': 0.0,
-            'total_flares_assigned': 0
+            'total_flares_assigned': 0,
+            'total_original_flare_volume': 0.0  # Track original volume before time proportioning
         }
         
         # Process each flare
@@ -717,19 +758,27 @@ class FlareService:
             else:
                 continue  # No matches
             
-            # Apply allocation strategy
+            # Track original volume for statistics
+            stats['total_original_flare_volume'] += flare.volume
+            
+            # Calculate time-proportioned flare volume
+            proportioned_volume = FlareService._calculate_time_proportioned_volume(
+                flare.volume, flare.valid_from, flare.valid_to, start_date, end_date
+            )
+            
+            # Apply allocation strategy using proportioned volume
             if len(competing_field_ids) == 1:
-                # No competition, assign entire flare
-                allocated_volumes = {competing_field_ids[0]: flare.volume}
+                # No competition, assign entire proportioned flare
+                allocated_volumes = {competing_field_ids[0]: proportioned_volume}
             else:
                 # Competition exists, apply strategy
                 if allocation_strategy == FlareAllocationStrategy.PRODUCTION_WEIGHTED:
                     allocated_volumes = FlareService._allocate_by_production(
-                        flare.volume, competing_field_ids, field_production_data
+                        proportioned_volume, competing_field_ids, field_production_data
                     )
                 else:  # EQUAL_SPLIT
                     allocated_volumes = FlareService._allocate_equally(
-                        flare.volume, competing_field_ids
+                        proportioned_volume, competing_field_ids
                     )
             
             # Update field assignments
@@ -756,6 +805,12 @@ class FlareService:
                 stats['fields_with_no_matches'] += 1
         
         stats['total_flares_assigned'] = len(flare_competition)
+        
+        time_proportion_ratio = stats['total_flare_volume_assigned'] / stats['total_original_flare_volume'] if stats['total_original_flare_volume'] > 0 else 0
+        logger.info(f"Flare allocation completed: {stats['total_flare_volume_assigned']:.6f} BCM assigned "
+                   f"(original: {stats['total_original_flare_volume']:.6f} BCM, time proportion: {time_proportion_ratio:.3f})")
+        logger.info(f"Field matches: {stats['fields_with_exact_matches']} exact, {stats['fields_with_buffer_matches']} buffer, "
+                   f"{stats['fields_with_no_matches']} no matches")
         
         return field_assignments, stats
 
