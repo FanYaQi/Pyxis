@@ -3,7 +3,7 @@
 #data
 
 # Files
-scripts_n_notebooks/data
+scripts_n_notebooks/
 docs/legacy
 db/data
 CLAUDE.md
