@@ -1,0 +1,26 @@
+{
+  "_description": "Column mappings from Argentina field data to Pyxis/OPGEE attributes",
+  "_note": "This file maps the intermediate field-level columns to final Pyxis column names",
+
+  "field_name": "name",
+  "basin": "basin",
+  "province": "province",
+  "resource_type": "resource_type",
+  "depth_m": "depth",
+  "latitude": "latitude",
+  "longitude": "longitude",
+  "centroid_h3_index": "centroid_h3_index",
+  "geometry": "geometry",
+  "functional_unit": "functional_unit",
+  "num_prod_wells": "num_prod_wells",
+  "gor": "gor",
+  "wor": "wor",
+  "operating_company": "operating_company",
+  "operating_company_id": "operating_company_id",
+  "oil_prod": "oil_prod",
+  "gas_prod": "gas_prod",
+  "water_prod": "water_prod",
+  "water_injected": "water_injected",
+  "gas_injected": "gas_injected",
+  "co2_injected": "co2_injected"
+}

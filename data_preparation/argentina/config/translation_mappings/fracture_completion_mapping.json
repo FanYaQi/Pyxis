@@ -1,0 +1,146 @@
+{
+  "file_description": "Fracture/Completion Data - Hydraulic fracturing job details for unconventional wells",
+  "source_file_pattern": "datos-de-fractura-de-pozos-de-hidrocarburos-adjunto-iv-actualizacin-diaria.csv",
+  "output_file_name": "fracture_completion_data_english.csv",
+  "data_format": "WIDE format - one row per fracture job",
+  "priority": "HIGH - Critical for unconventional analysis",
+  "use_case": "Completion intensity metrics, proppant loading, pressure/horsepower requirements for Vaca Muerta shale and tight gas plays",
+
+  "column_mappings": {
+    "id_base_fractura_adjiv": "fracture_job_id",
+    "idpozo": "well_id",
+    "sigla": "well_name",
+    "cuenca": "basin",
+    "areapermisoconcesion": "permit_area",
+    "yacimiento": "field_name",
+    "formacion_productiva": "producing_formation",
+    "tipo_reservorio": "reservoir_type",
+    "subtipo_reservorio": "reservoir_subtype",
+    "longitud_rama_horizontal_m": "horizontal_lateral_length_m",
+    "cantidad_fracturas": "fracture_stages_count",
+    "tipo_terminacion": "completion_type",
+    "arena_bombeada_nacional_tn": "proppant_domestic_tons",
+    "arena_bombeada_importada_tn": "proppant_imported_tons",
+    "agua_inyectada_m3": "frac_fluid_water_m3",
+    "co2_inyectado_m3": "frac_fluid_co2_m3",
+    "presion_maxima_psi": "max_treatment_pressure_psi",
+    "potencia_equipos_fractura_hp": "frac_equipment_total_horsepower",
+    "fecha_inicio_fractura": "frac_start_date",
+    "fecha_fin_fractura": "frac_end_date",
+    "fecha_data": "data_date",
+    "anio_if": "frac_start_year",
+    "mes_if": "frac_start_month",
+    "anio_ff": "frac_end_year",
+    "mes_ff": "frac_end_month",
+    "anio_carga": "data_load_year",
+    "mes_carga": "data_load_month",
+    "empresa_informante": "reporting_company",
+    "mes": "month",
+    "anio": "year"
+  },
+
+  "value_mappings": {
+    "reservoir_type": {
+      "CONVENCIONAL": "conventional",
+      "NO CONVENCIONAL": "unconventional",
+      "NO DISCRIMINADO": "not_specified"
+    },
+    "reservoir_subtype": {
+      "SHALE": "shale",
+      "TIGHT": "tight_gas_oil",
+      "CBM": "coalbed_methane",
+      "": "conventional_not_applicable"
+    },
+    "completion_type": {
+      "Punzado": "perforation_only",
+      "Camisas deslizables": "sliding_sleeve_multiport",
+      "Camisas y punzados": "hybrid_sleeve_and_perf",
+      "Tapón disparo": "plug_and_perf",
+      "Jetteo": "abrasive_jetting"
+    }
+  },
+
+  "completion_type_descriptions": {
+    "plug_and_perf": "Plug-and-perf - industry standard multi-stage completion. Set bridge plug, perforate casing, pump frac stage, repeat for each stage. Allows precise stage placement. Most common for shale horizontal wells. Enables 10-50+ stages per well.",
+    "sliding_sleeve_multiport": "Sliding sleeve - pre-installed mechanical sleeves with ports. Open sleeves sequentially from toe to heel, no perforations needed. Faster operation, less equipment. Limited to simpler completions, 5-15 stages typical.",
+    "hybrid_sleeve_and_perf": "Hybrid - combination of sliding sleeves and perforations. Offers flexibility for complex completions. Sleeves for some stages, perforations for others. Balances speed and precision.",
+    "perforation_only": "Perforation only - simple single-stage or limited multi-stage completion. Just perforate casing, no plugs or sleeves. Used for conventional wells or simple treatments.",
+    "abrasive_jetting": "Abrasive jetting - use high-pressure abrasive slurry to jet through casing. Creates perforation-like holes. Alternative to shaped-charge perforations. Less common, specific applications."
+  },
+
+  "parameter_descriptions": {
+    "horizontal_lateral_length_m": "Length of horizontal section drilled through reservoir. Longer laterals contact more reservoir, enable more frac stages. Vaca Muerta: 1500-3000m typical. US shale: up to 3000-4500m.",
+    "fracture_stages_count": "Number of discrete hydraulic fracture treatments pumped in well. Each stage creates fracture network in reservoir section. Shale horizontal: 15-50 stages typical. More stages = better reservoir contact but higher cost.",
+    "proppant_domestic_tons": "Proppant (sand or ceramic) sourced domestically. Keeps fractures open after pumping stops. Measured in metric tons. Argentina produces frac sand domestically but also imports.",
+    "proppant_imported_tons": "Proppant imported from other countries (often Brazil, USA, China). Higher quality or specific mesh sizes may be imported. Generally more expensive than domestic.",
+    "frac_fluid_water_m3": "Volume of water-based fluid pumped during hydraulic fracturing. Creates fractures and carries proppant. Typical: 10,000-25,000 m3 per well for shale horizontal. Water sourcing and disposal are key environmental concerns.",
+    "frac_fluid_co2_m3": "Volume of CO2 injected - used in some fracturing operations instead of or with water. Experimental in Argentina. More common in water-scarce regions or for enhanced recovery.",
+    "max_treatment_pressure_psi": "Maximum surface pressure during fracturing in pounds per square inch (psi). Indicates fracture pressure and stress state. Typical: 8,000-12,000 psi for shale. Limited by casing burst rating and formation fracture gradient.",
+    "frac_equipment_total_horsepower": "Total hydraulic horsepower of all pumping units used for frac job. Indicates job size and intensity. Conventional: 5,000-10,000 hp. Shale horizontal: 10,000-50,000 hp. Larger jobs = more pumps, higher rates, more proppant."
+  },
+
+  "calculated_metrics": {
+    "total_proppant_tons": "proppant_domestic_tons + proppant_imported_tons",
+    "proppant_intensity_tons_per_m": "total_proppant_tons / horizontal_lateral_length_m - KEY METRIC for completion quality. Typical: 0.5-3 tons/m for shale. Higher = more intensive, better production but higher cost.",
+    "proppant_per_stage_tons": "total_proppant_tons / fracture_stages_count - Average proppant per stage. Typical: 50-150 tons/stage for shale.",
+    "water_per_stage_m3": "frac_fluid_water_m3 / fracture_stages_count - Water volume per stage. Typical: 500-1500 m3/stage.",
+    "stage_spacing_m": "horizontal_lateral_length_m / fracture_stages_count - Distance between stages. Typical: 30-60m for shale.",
+    "frac_duration_days": "(frac_end_date - frac_start_date).days - Job duration. Typical: 3-10 days for shale horizontal.",
+    "is_high_intensity": "proppant_intensity_tons_per_m > 0.5 - Binary flag for high-intensity completion",
+    "horsepower_per_stage": "frac_equipment_total_horsepower / fracture_stages_count"
+  },
+
+  "unit_notes": {
+    "m": "Meters - lateral length, stage spacing",
+    "tons": "Metric tons - proppant mass (1000 kg)",
+    "m3": "Cubic meters - water volume",
+    "psi": "Pounds per square inch - pressure (multiply by 0.0689 for MPa)",
+    "hp": "Horsepower - hydraulic horsepower (multiply by 0.746 for kW)",
+    "conversions": {
+      "psi_to_mpa": "multiply by 0.0689",
+      "hp_to_kw": "multiply by 0.746",
+      "tons_per_m_to_lbs_per_ft": "multiply by 670"
+    }
+  },
+
+  "industry_benchmarks": {
+    "vaca_muerta_shale": {
+      "horizontal_length_m": "1500-3000",
+      "fracture_stages": "20-40",
+      "proppant_intensity_tons_per_m": "1.0-2.5",
+      "proppant_per_stage_tons": "80-150",
+      "water_per_stage_m3": "800-1500",
+      "max_pressure_psi": "8000-11000",
+      "total_horsepower": "15000-40000"
+    },
+    "tight_gas": {
+      "horizontal_length_m": "500-1500",
+      "fracture_stages": "5-15",
+      "proppant_intensity_tons_per_m": "0.3-1.0",
+      "max_pressure_psi": "7000-10000"
+    },
+    "conventional_vertical": {
+      "fracture_stages": "1-3",
+      "proppant_total_tons": "20-80",
+      "water_total_m3": "200-800"
+    }
+  },
+
+  "technical_notes": {
+    "completion_evolution": "Argentina unconventional completions have intensified over time - more stages, more proppant per foot, higher horsepower. Tracking these trends shows technology advancement.",
+    "proppant_importance": "Proppant intensity (tons/m) is strongest predictor of well productivity in shale. Higher loading = better production but diminishing returns above ~2.5 tons/m.",
+    "vaca_muerta_specifics": "Vaca Muerta formation requires high-intensity completions due to low permeability (<0.001 mD) and complex mineralogy. Typical completions cost $3-6 million USD.",
+    "pressure_limitations": "Max pressure limited by: (1) casing burst rating, (2) formation fracture pressure, (3) wellhead equipment rating. Overpressure can cause casing failure.",
+    "horsepower_requirements": "Horsepower determines pump rate capability. Higher hp = higher rate = wider fractures. Limited by wellbore friction and formation acceptance.",
+    "water_sourcing": "Water availability is major constraint in some Argentina regions. Recycling produced water becoming more common.",
+    "completion_types_by_play": "Shale: 90%+ plug-and-perf. Tight gas: mix of plug-and-perf and sliding sleeves. Conventional: simple perforations."
+  },
+
+  "data_quality_notes": {
+    "missing_data": "Some fields may be null/zero - not all operators report all parameters",
+    "zero_vs_null": "Zero may mean 'not used' (e.g., CO2) or 'not reported'. Check context.",
+    "imported_vs_domestic": "Proppant source tracking not always complete - totals more reliable than split",
+    "pressure_units": "Confirm units are psi not bar or kPa - typical range check 5000-15000",
+    "lateral_length": "Zero lateral length means vertical well or data not reported"
+  }
+}

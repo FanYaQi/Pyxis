@@ -1,0 +1,104 @@
+{
+  "file_description": "Daily Oil Production - Average daily oil production rate by field",
+  "source_file_pattern": "produccin-de-petrleo-promedio-diaria-por-yacimiento.csv",
+  "output_file_name": "daily_oil_production_english.csv",
+  "data_format": "WIDE format - one row per field-month with average daily rate",
+  "priority": "MEDIUM - Useful for validation and rate analysis",
+  "use_case": "Validate monthly totals, track production rates, calculate uptime/downtime, identify production interruptions",
+
+  "column_mappings": {
+    "anio": "year",
+    "mes": "month",
+    "indice_tiempo": "time_index",
+    "empresa": "company_name",
+    "areapermisoconcesion": "permit_area_name",
+    "idareapermisoconcesion": "permit_area_id",
+    "areayacimiento": "field_name",
+    "idareayacimiento": "field_id",
+    "cuenca": "basin",
+    "provincia": "province",
+    "produccion_petroleo_promedio_dia_m3": "oil_production_avg_daily_m3"
+  },
+
+  "field_descriptions": {
+    "oil_production_avg_daily_m3": "Average daily oil production rate in cubic meters per day (m3/day) for the given month. Arithmetic mean of daily production over all producing days in the month.",
+    "time_index": "Year-month identifier in YYYY-MM format for time series analysis",
+    "field_id": "Unique field identifier - matches field_id in monthly production and field shapes",
+    "company_name": "Operating company name",
+    "basin": "Sedimentary basin (Neuquina, Golfo San Jorge, Austral, Noroeste, Cuyana)"
+  },
+
+  "unit_notes": {
+    "m3_per_day": "Cubic meters per day - average daily rate",
+    "m3": "Cubic meters - if converting to monthly total, multiply by days in month",
+    "oil_conversion": "m3/day to bbl/day: multiply by 6.28981",
+    "monthly_validation": "To validate: oil_production_avg_daily_m3 * days_in_month ≈ monthly_total_m3 from oil_field_production file"
+  },
+
+  "calculated_metrics": {
+    "monthly_expected_m3": "oil_production_avg_daily_m3 * days_in_month - Expected monthly production if running at full capacity",
+    "production_uptime_fraction": "actual_monthly_m3 / (oil_production_avg_daily_m3 * days_in_month) - Fraction of time actually producing. <1.0 indicates downtime.",
+    "downtime_days_equivalent": "(1 - uptime_fraction) * days_in_month - Equivalent days of downtime in the month",
+    "is_intermittent_production": "uptime_fraction < 0.7 - Binary flag for fields with significant downtime"
+  },
+
+  "data_quality_validation": {
+    "monthly_total_check": "Compare daily avg * days to monthly total from oil_field_production file. Should match within ~5% unless significant downtime.",
+    "zero_production": "Zero values may indicate: (1) field shut-in, (2) maintenance, (3) no production that month, (4) data not reported",
+    "outlier_detection": "Sudden spikes or drops in daily rate month-to-month may indicate: workovers, new wells online, equipment failure, or data errors",
+    "consistency_check": "Daily rate should be relatively stable unless new wells added or significant changes. Large variations warrant investigation."
+  },
+
+  "technical_notes": {
+    "average_calculation": "This is arithmetic mean of daily production over the month. Does not account for days with zero production vs no production.",
+    "uptime_analysis": "Comparing daily average to monthly total reveals production uptime. Mature fields often have 80-95% uptime. Newer fields may be higher.",
+    "rate_vs_volume": "Daily rate (m3/day) measures intensity of production. Monthly volume (m3) measures total production. Both needed for complete analysis.",
+    "validation_importance": "Cross-checking daily rates against monthly totals is critical quality control. Mismatches indicate data errors or downtime.",
+    "decline_curve_analysis": "Daily rates more useful for decline curve analysis than monthly totals. Shows production rate changes over time.",
+    "comparison_to_us_units": "US oilfield uses bbl/day (barrels per day) instead of m3/day. 1 m3/day = 6.28981 bbl/day.",
+    "downtime_causes": "Common causes of reduced uptime: equipment maintenance, well workovers, pipeline/facility shutdowns, regulatory restrictions, seasonal weather impacts."
+  },
+
+  "data_integration": {
+    "join_key": "field_id + year + month - join to monthly production data",
+    "validation_workflow": [
+      "1. Load daily average data (this file)",
+      "2. Load monthly production totals (oil_field_production file)",
+      "3. Calculate expected monthly = daily avg * days in month",
+      "4. Compare to actual monthly total",
+      "5. Calculate uptime fraction = actual / expected",
+      "6. Flag fields with uptime < 70% for investigation"
+    ],
+    "complementary_data": "Use with monthly production totals to calculate uptime, identify production interruptions, and validate data quality"
+  },
+
+  "use_cases": {
+    "data_validation": "Primary use is validating monthly production totals. Daily avg * days should match monthly total within 5-10%.",
+    "uptime_calculation": "Calculate field operating uptime by comparing actual monthly to expected (daily * days). Identify reliability issues.",
+    "rate_analysis": "Track production rate trends over time. Identify decline rates, new well impacts, workover effectiveness.",
+    "anomaly_detection": "Sudden changes in daily rate indicate production events: well additions, failures, workovers, or data errors.",
+    "operator_performance": "Compare uptime across operators to identify best practices and reliability differences."
+  },
+
+  "limitations": {
+    "no_well_level": "This is field-level average only. Does not show individual well contributions.",
+    "averaging_masks_detail": "Daily average smooths out intra-month variation. Doesn't show when production occurred.",
+    "zero_ambiguity": "Zero production could mean shut-in field or missing data. Cannot distinguish without additional info.",
+    "no_gas_equivalent": "Only oil has daily average data. No equivalent file for gas production rates."
+  },
+
+  "typical_values": {
+    "small_field_m3_day": "10-100 m3/day typical for small conventional field with 5-20 wells",
+    "medium_field_m3_day": "100-1000 m3/day for medium conventional field or small Vaca Muerta development",
+    "large_field_m3_day": "1000-10000 m3/day for large conventional field or significant Vaca Muerta field",
+    "giant_field_m3_day": ">10000 m3/day for major fields. Top Argentina fields produce 20000+ m3/day.",
+    "expected_uptime": "Mature fields: 80-95%. New fields: 90-98%. Fields <70% uptime indicate issues."
+  },
+
+  "example_analysis": {
+    "uptime_calculation_python": "uptime = monthly_total_m3 / (daily_avg_m3 * days_in_month)",
+    "downtime_days_python": "downtime_days = (1 - uptime) * days_in_month",
+    "validation_check_python": "is_valid = abs(monthly_total_m3 - daily_avg_m3 * days_in_month) / monthly_total_m3 < 0.10  # Within 10%",
+    "rate_decline_python": "monthly_decline_fraction = (prev_month_rate - curr_month_rate) / prev_month_rate"
+  }
+}

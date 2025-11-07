@@ -1,0 +1,37 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+
+# Pipenv
+Pipfile.lock
+
+# Raw data files (user-provided, often large)
+argentina/raw/
+argentina/output/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temp files
+*.tmp
+.cache/
+argentina/config/*.md

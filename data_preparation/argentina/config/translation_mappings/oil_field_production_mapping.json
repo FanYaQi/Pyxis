@@ -1,0 +1,68 @@
+{
+  "file_description": "Oil Field Production - Monthly field-level oil production data",
+  "source_file_pattern": "produccin-de-petrleo-por-yacimiento.csv",
+  "output_file_name": "oil_field_production_english.csv",
+  "data_format": "LONG format - multiple rows per field-month, one per concept",
+
+  "column_mappings": {
+    "indice_tiempo": "time_index",
+    "anio": "year",
+    "mes": "month",
+    "idempresa": "company_id",
+    "empresa": "company_name",
+    "idareapermisoconcesion": "permit_area_id",
+    "areapermisoconcesion": "permit_area_name",
+    "idareayacimiento": "field_id",
+    "areayacimiento": "field_name",
+    "idcuenca": "basin_id",
+    "cuenca": "basin",
+    "idprovincia": "province_id",
+    "provincia": "province",
+    "idubicacion": "location_id",
+    "ubicacion": "location",
+    "idconcepto": "concept_id",
+    "concepto": "concept",
+    "cantidad": "quantity",
+    "observaciones": "notes",
+    "desc_mes": "month_name",
+    "fecha_data": "data_date"
+  },
+
+  "value_mappings": {
+    "concept": {
+      "Producción Primaria (m3)": "primary_production_m3",
+      "Producción Secundaria (m3)": "secondary_production_m3",
+      "Producción por Recuperación Asistida (m3)": "tertiary_eor_production_m3",
+      "Producción No Convencional (m3)": "unconventional_production_m3",
+      "Producción de Agua (m3)": "water_production_m3",
+      "Inyección de Agua (m3)": "water_injection_m3",
+      "Producción de Condensado (m3)": "condensate_production_m3",
+      "Producción de Gasolina Estabilizada (m3)": "stabilized_gasoline_production_m3",
+      "Consumo en Yacimiento (m3)": "field_fuel_consumption_m3",
+      "Densidad Media (Ton/m3)": "oil_density_avg_ton_per_m3"
+    },
+    "location": {
+      "On Shore": "onshore",
+      "Off Shore": "offshore"
+    }
+  },
+
+  "concept_descriptions": {
+    "primary_production_m3": "Primary recovery - production driven by natural reservoir pressure (solution gas drive, water drive, gravity drainage). No artificial pressure maintenance.",
+    "secondary_production_m3": "Secondary recovery - production from pressure maintenance via waterflooding or gas injection. Maintains reservoir pressure to continue production.",
+    "tertiary_eor_production_m3": "Tertiary/Enhanced Oil Recovery (EOR) - advanced recovery methods including thermal (steam), chemical (polymer, surfactant), and miscible gas (CO2, N2) flooding.",
+    "unconventional_production_m3": "Unconventional oil production - tight oil and shale oil from low-permeability formations requiring hydraulic fracturing and horizontal drilling.",
+    "water_production_m3": "Formation water co-produced with oil - must be separated and disposed or re-injected. High water production reduces oil production efficiency.",
+    "water_injection_m3": "Water injected into reservoir for pressure maintenance (waterflooding) or disposal of produced water into approved formations.",
+    "condensate_production_m3": "Liquid hydrocarbons (C5+) condensed from gas production - valuable light oil product, typically 45-60° API gravity.",
+    "stabilized_gasoline_production_m3": "Natural gasoline/naphtha extracted from gas processing - light hydrocarbons (C3-C5) used as petrochemical feedstock or blending component.",
+    "field_fuel_consumption_m3": "Oil consumed within the field for power generation, heating, or equipment fuel - not sold as product.",
+    "oil_density_avg_ton_per_m3": "Average oil density in metric tons per cubic meter - used to calculate API gravity. Typical range: 0.8-1.0 ton/m3. Formula: API = (141.5 / density) - 131.5"
+  },
+
+  "unit_notes": {
+    "m3": "Cubic meters - Argentina standard volume unit for oil",
+    "ton_per_m3": "Metric tons per cubic meter - density unit for API calculation",
+    "conversion_to_opgee": "Oil: m3 to barrels (bbl) multiply by 6.28981"
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "file_description": "Field Shapes & Depth - Field boundary polygons and aggregated depth data",
+  "source_file_pattern": "produccin-hidrocarburos-yacimientos-segn-profundidad-promedio.csv",
+  "output_file_name": "field_shapes_depth_english.csv",
+  "data_format": "WIDE format - one row per field (static data)",
+  "priority": "HIGH - Provides geometry and depth",
+  "use_case": "GIS mapping, H3 spatial indexing, depth-based analysis, field boundary visualization",
+
+  "column_mappings": {
+    "idya": "field_id",
+    "areayacimiento": "field_name",
+    "empresa_informante": "reporting_company",
+    "idempresa_informante": "reporting_company_id",
+    "empresa_operadora": "operating_company",
+    "idempresa_operadora": "operating_company_id",
+    "profundidad_prom": "depth_avg_m",
+    "profundidad_min": "depth_min_m",
+    "profundidad_max": "depth_max_m",
+    "geojson": "field_boundary_geojson"
+  },
+
+  "field_descriptions": {
+    "field_id": "Unique field identifier - matches field_id in production data for joining",
+    "field_name": "Official field name (yacimiento) - may contain multiple reservoirs",
+    "reporting_company": "Company that reported the data to government - may differ from operator",
+    "operating_company": "Current field operator - company responsible for operations",
+    "depth_avg_m": "Average well depth in meters - arithmetic mean of all wells in field. Proxy for reservoir depth and drilling cost.",
+    "depth_min_m": "Shallowest well total depth in field in meters - indicates shallowest target zone",
+    "depth_max_m": "Deepest well total depth in field in meters - indicates deepest target zone or exploration drilling",
+    "field_boundary_geojson": "Field boundary polygon in GeoJSON MultiPolygon format - defines areal extent of field for spatial analysis"
+  },
+
+  "depth_significance": {
+    "shallow_fields": "depth_avg_m < 1000m - Shallow conventional reservoirs, lower drilling costs, older producing areas. Common in Golfo San Jorge basin.",
+    "medium_depth": "depth_avg_m 1000-2500m - Typical depth for many Argentina conventional fields. Moderate drilling costs.",
+    "deep_conventional": "depth_avg_m 2500-4000m - Deep conventional targets. Higher costs, better reservoir quality often needed for economics.",
+    "unconventional_depth": "depth_avg_m 2000-3500m - Vaca Muerta shale and other unconventional plays. Depth affects horizontal section placement."
+  },
+
+  "geometry_usage": {
+    "format": "GeoJSON MultiPolygon - can contain multiple disconnected polygons for fields with separated areas",
+    "coordinate_system": "WGS84 (EPSG:4326) - longitude/latitude in decimal degrees",
+    "polygon_structure": "coordinates array: [[[lon, lat], [lon, lat], ...]] for each polygon ring",
+    "use_cases": [
+      "Calculate field area (km2) using geospatial libraries",
+      "Extract centroid coordinates for mapping",
+      "Generate H3 spatial indices for hierarchical indexing",
+      "Convert to WKT for database storage",
+      "Overlay with satellite data (flares, methane plumes)",
+      "Calculate distances between fields",
+      "Regional/basin-level aggregation"
+    ]
+  },
+
+  "depth_analysis": {
+    "cost_proxy": "Deeper fields generally have higher drilling and completion costs. depth_avg_m correlates with well cost.",
+    "reservoir_pressure": "Depth correlates with initial reservoir pressure (pore pressure gradient ~0.45-0.5 psi/ft or 10-11 kPa/m). Affects production mechanism.",
+    "temperature": "Geothermal gradient ~25-30°C/km. Temperature affects fluid viscosity, ESP performance, completion design.",
+    "depth_range": "depth_max_m - depth_min_m indicates vertical heterogeneity - multiple producing zones at different depths.",
+    "unconventional_indicator": "Vaca Muerta shale typically 2200-2900m depth. Fields in Neuquina basin at this depth likely target shale."
+  },
+
+  "calculated_fields": {
+    "field_area_km2": "Calculate from geojson using geospatial library (shapely, geopandas)",
+    "centroid_latitude": "Extract from polygon centroid",
+    "centroid_longitude": "Extract from polygon centroid",
+    "h3_index_res8": "Generate H3 index at resolution 8 (~0.74 km2 hexagons) from centroid",
+    "h3_index_res6": "Generate H3 index at resolution 6 (~36 km2 hexagons) for regional analysis",
+    "wkt_geometry": "Convert GeoJSON to WKT format for database storage",
+    "depth_range_m": "depth_max_m - depth_min_m",
+    "depth_category": "Classify as shallow/medium/deep based on depth_avg_m"
+  },
+
+  "unit_notes": {
+    "meters": "All depth measurements in meters",
+    "decimal_degrees": "Geometry coordinates in WGS84 decimal degrees (longitude, latitude)",
+    "depth_conversion": "Meters to feet: multiply by 3.28084",
+    "area_calculation": "Use pyproj or geopandas to calculate area from WGS84 coordinates"
+  },
+
+  "data_integration": {
+    "join_key": "field_id - join to field production data on this key",
+    "one_to_many": "One field_shape record → many field_production_monthly records",
+    "enrichment": "Adds geometry, depth, and operating company to production time series",
+    "typical_workflow": [
+      "1. Load field production data (field-month time series)",
+      "2. Load field shapes (field static data)",
+      "3. Left join production to shapes on field_id",
+      "4. Extract centroid, calculate H3 indices",
+      "5. Add depth category, area",
+      "6. Export to Pyxis with geometry in WKT format"
+    ]
+  },
+
+  "operating_vs_reporting_company": {
+    "operating_company": "Current field operator - responsible for daily operations, production, drilling. This is the company actively managing the field.",
+    "reporting_company": "Company that reported data to government - may be working interest owner, operator, or designated reporter. Can differ from operator.",
+    "why_different": "Joint ventures, farm-outs, or regulatory requirements may cause reporting company to differ from operator. Use operating_company for operational analysis.",
+    "data_quality": "Operating company more reliable for current operations. Reporting company may be historical."
+  },
+
+  "geometry_quality": {
+    "precision": "Polygons are government-defined field boundaries - may not match exact producing limits",
+    "purpose": "Administrative boundaries for regulation and reporting - not necessarily geological boundaries",
+    "resolution": "Boundaries may be simplified from detailed surveys - suitable for regional analysis, not detailed subsurface mapping",
+    "updates": "Field boundaries may change over time as fields are redefined, merged, or split. This is a snapshot.",
+    "missing_geometry": "Some fields may lack geometry data - newly defined fields or data gaps"
+  },
+
+  "technical_notes": {
+    "vaca_muerta_identification": "Neuquina basin fields with depth_avg_m 2200-2900m likely produce from Vaca Muerta shale",
+    "golfo_san_jorge_characteristics": "Golfo San Jorge basin fields typically shallower (800-1800m), conventional reservoirs",
+    "depth_vs_age": "Shallower fields often older, more mature production. Deeper fields may be newer developments or deeper pay zones.",
+    "multiple_zones": "Large depth_range_m indicates multiple producing formations at different depths in same field",
+    "horizontal_well_depths": "For horizontal wells, depth_avg_m represents landing depth + lateral section",
+    "geojson_multipolygon": "MultiPolygon allows for non-contiguous field areas - some fields have separate producing areas"
+  },
+
+  "example_calculations": {
+    "extract_centroid_python": "from shapely.geometry import shape; geom = shape(geojson); centroid = geom.centroid; lat = centroid.y; lon = centroid.x",
+    "calculate_area_python": "from shapely.geometry import shape; from pyproj import Geod; geom = shape(geojson); geod = Geod(ellps='WGS84'); area_m2, _ = geod.geometry_area_perimeter(geom); area_km2 = abs(area_m2) / 1e6",
+    "generate_h3_python": "import h3; h3_index = h3.geo_to_h3(lat, lon, resolution=8)",
+    "convert_to_wkt_python": "from shapely.geometry import shape; geom = shape(geojson); wkt = geom.wkt"
+  }
+}

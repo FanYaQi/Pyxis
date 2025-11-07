@@ -1,0 +1,71 @@
+{
+  "file_description": "Gas Field Production - Monthly field-level gas production data",
+  "source_file_pattern": "produccin-de-gas-por-yacimiento.csv",
+  "output_file_name": "gas_field_production_english.csv",
+  "data_format": "LONG format - multiple rows per field-month, one per concept",
+
+  "column_mappings": {
+    "indice_tiempo": "time_index",
+    "anio": "year",
+    "mes": "month",
+    "idempresa": "company_id",
+    "empresa": "company_name",
+    "idareapermisoconcesion": "permit_area_id",
+    "areapermisoconcesion": "permit_area_name",
+    "idareayacimiento": "field_id",
+    "areayacimiento": "field_name",
+    "idcuenca": "basin_id",
+    "cuenca": "basin",
+    "idprovincia": "province_id",
+    "provincia": "province",
+    "idubicacion": "location_id",
+    "ubicacion": "location",
+    "idconcepto": "concept_id",
+    "concepto": "concept",
+    "cantidad": "quantity",
+    "observaciones": "notes",
+    "desc_mes": "month_name",
+    "fecha_data": "data_date"
+  },
+
+  "value_mappings": {
+    "concept": {
+      "Gas de Alta Presión (Mm3)": "high_pressure_gas_mm3",
+      "Gas de Media Presión (Mm3)": "medium_pressure_gas_mm3",
+      "Gas de Baja Presión (Mm3)": "low_pressure_gas_mm3",
+      "Gas No Convencional (Mm3)": "unconventional_gas_mm3",
+      "Inyectado a Formación (Mm3)": "gas_reinjection_formation_mm3",
+      "Inyección para Almacenamiento (Mm3)": "gas_injection_storage_mm3",
+      "Extraído del almacenamiento (Mm3)": "gas_extraction_storage_mm3",
+      "Equivalente calórico del gas (Kcal/m3)": "gas_heating_value_kcal_per_m3"
+    },
+    "location": {
+      "On Shore": "onshore",
+      "Off Shore": "offshore"
+    }
+  },
+
+  "concept_descriptions": {
+    "high_pressure_gas_mm3": "High-pressure gas production - wellhead pressure >1000 psi (7 MPa). Requires minimal processing, can flow directly to pipeline. Highest quality, lowest cost.",
+    "medium_pressure_gas_mm3": "Medium-pressure gas production - wellhead pressure 500-1000 psi (3.5-7 MPa). Requires moderate compression and processing before pipeline delivery.",
+    "low_pressure_gas_mm3": "Low-pressure gas production - wellhead pressure <500 psi (3.5 MPa). Requires significant compression, often from mature/depleted reservoirs. Higher operating costs.",
+    "unconventional_gas_mm3": "Unconventional gas production - from shale gas, tight gas, or coalbed methane. Requires hydraulic fracturing and horizontal drilling. Typically lower reservoir pressure.",
+    "gas_reinjection_formation_mm3": "Gas reinjected into producing formation for pressure maintenance (gas cycling) or enhanced oil recovery (gas cap injection). Not sold as product.",
+    "gas_injection_storage_mm3": "Gas injected into underground storage formations (typically depleted reservoirs or aquifers) for seasonal storage. Retrieved during high-demand periods.",
+    "gas_extraction_storage_mm3": "Gas extracted from underground storage during high-demand periods (winter heating season). Previously injected gas now being withdrawn.",
+    "gas_heating_value_kcal_per_m3": "Calorific content of gas in kilocalories per cubic meter. Typical range: 8,000-10,000 kcal/m3 (320-400 BTU/scf). Higher heating value = higher sales price."
+  },
+
+  "unit_notes": {
+    "mm3": "Million cubic meters (Mm3) = 10^6 m3 - Argentina standard for gas volumes",
+    "kcal_per_m3": "Kilocalories per cubic meter - heating value/energy content",
+    "conversion_to_opgee": "Gas: Mm3 to m3 multiply by 1,000,000",
+    "pressure_categories": "High >1000 psi, Medium 500-1000 psi, Low <500 psi"
+  },
+
+  "technical_notes": {
+    "pressure_classification": "Gas pressure categories reflect wellhead flowing pressure and indicate reservoir maturity, processing requirements, and operating costs",
+    "unconventional_identification": "Unconventional gas requires hydraulic fracturing and is typically from shale (Vaca Muerta), tight sands, or coal seams",
+    "reinjection_purposes": "Gas reinjection used for: (1) pressure maintenance, (2) gas cycling in condensate reservoirs, (3) gas cap injection for oil recovery, (4) CO2 substitute in EOR"
+  }
+}

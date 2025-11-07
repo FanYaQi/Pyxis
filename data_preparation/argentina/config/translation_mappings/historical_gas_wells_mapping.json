@@ -1,0 +1,131 @@
+{
+  "file_description": "Historical Gas Wells (Pre-2009) - Monthly well count by status and type for gas fields",
+  "source_file_pattern": "pozos-productivos-de-gas-ant-2009.csv",
+  "output_file_name": "historical_gas_wells_pre2009_english.csv",
+  "data_format": "LONG format - multiple rows per field-month, one per well type and status concept",
+  "time_coverage": "1999-2008 (pre-2009 historical data)",
+  "priority": "LOW - Historical data, useful for long-term trend analysis but not critical for recent operations",
+  "use_case": "Historical well count trends, operator consolidation history, long-term field development patterns",
+
+  "column_mappings": {
+    "Año": "year",
+    "Mes": "month",
+    "Yacimiento": "field_name",
+    "Provincia": "province",
+    "Ubicacion": "location",
+    "TipoDePozo": "well_type",
+    "Concepto": "status_concept",
+    "Cantidad": "well_count",
+    "Empresa": "company_name",
+    "fecha_data": "data_date"
+  },
+
+  "value_mappings": {
+    "location": {
+      "ON SHORE": "onshore",
+      "OFF SHORE": "offshore"
+    },
+    "well_type": {
+      "Productivos de Gas": "gas_producing_wells",
+      "Para Recuperación Secundaria o Asistida": "secondary_eor_wells"
+    },
+    "status_concept": {
+      "Extracción Efectiva": "active_production",
+      "Parados Transitoriamente": "temporarily_shut_in",
+      "Zonas Alejadas": "remote_areas_no_infrastructure",
+      "Reserva": "shut_in_reserve",
+      "Reserva p/ Rec.Sec. ó Asistida": "reserve_for_secondary_eor",
+      "Otras Causas": "other_inactive_reasons",
+      "En Inyección de Agua": "water_injection_active",
+      "En Inyección de Gas": "gas_injection_active",
+      "Mantenimiento de Presión": "pressure_maintenance_injection"
+    }
+  },
+
+  "field_descriptions": {
+    "well_count": "Number of wells in the specified status category for the field-month. Integer count.",
+    "well_type": "Primary well classification: producing wells vs injection/EOR wells",
+    "status_concept": "Specific operational status or reason for well state",
+    "field_name": "Field name (yacimiento) - note: no field_id in historical data, matching to modern data requires name matching",
+    "data_date": "Date stamp of data entry - end of month"
+  },
+
+  "status_concept_descriptions": {
+    "active_production": "Wells actively producing gas - flowing naturally or with artificial lift. Contributing to monthly production.",
+    "temporarily_shut_in": "Wells temporarily shut in - capable of production but not currently flowing. Reasons: maintenance, equipment issues, market conditions, regulatory.",
+    "remote_areas_no_infrastructure": "Wells in remote areas lacking pipeline infrastructure or gathering facilities. May be capable of production but cannot deliver gas to market.",
+    "shut_in_reserve": "Wells drilled and completed but held in reserve - not producing. Economic or strategic reasons for keeping shut in.",
+    "reserve_for_secondary_eor": "Wells drilled for future use in secondary recovery or EOR operations. Not currently being used for production or injection.",
+    "other_inactive_reasons": "Wells inactive for other unspecified reasons. May include: regulatory restrictions, legal disputes, technical issues, or pending decisions.",
+    "water_injection_active": "Wells actively injecting water for secondary recovery (waterflooding) or pressure maintenance. Not producing.",
+    "gas_injection_active": "Wells actively injecting gas for pressure maintenance, gas cycling in condensate reservoirs, or gas cap maintenance.",
+    "pressure_maintenance_injection": "Wells used for pressure maintenance - may include water, gas, or other fluid injection to support reservoir pressure and oil/gas production."
+  },
+
+  "well_type_descriptions": {
+    "gas_producing_wells": "Wells primarily drilled and completed for gas production. May be producing, shut-in, or in reserve status.",
+    "secondary_eor_wells": "Wells used for secondary recovery (waterflooding) or enhanced oil recovery (EOR) operations. Includes active injectors and wells held in reserve for future injection."
+  },
+
+  "unit_notes": {
+    "well_count": "Integer count of wells - not production volumes",
+    "aggregation": "Counts are per field per month. Sum across concepts for total well count.",
+    "no_production_data": "This file contains well counts only, not production volumes or rates"
+  },
+
+  "data_quality_notes": {
+    "no_field_id": "Historical data lacks field_id. Must match to modern data using field_name string matching. Field names may have changed over time.",
+    "company_name_changes": "Company names from 1999-2008 reflect historical ownership. Many companies have merged, been acquired, or changed names.",
+    "data_completeness": "Pre-2009 data may have gaps or inconsistencies. Data collection standards improved in later years.",
+    "concept_evolution": "Status concepts in historical data may not perfectly match modern classifications.",
+    "zero_vs_null": "Zero well count may mean: (1) no wells in that status, (2) field not active that month, (3) data not reported."
+  },
+
+  "calculated_metrics": {
+    "total_wells_per_field_month": "SUM(well_count) across all concepts for field-month",
+    "active_fraction": "active_production_count / total_well_count - fraction of wells producing",
+    "shutin_fraction": "temporarily_shut_in_count / total_well_count - indicates reliability/uptime issues",
+    "injector_count": "water_injection_active + gas_injection_active - total active injectors",
+    "producer_to_injector_ratio": "active_production_count / injector_count - indicates secondary recovery intensity"
+  },
+
+  "technical_notes": {
+    "historical_context": "1999-2008 was pre-Vaca Muerta era - mostly conventional production. Unconventional shale development began ~2010.",
+    "data_vintage": "This data is 15-25 years old. Well counts and operators have changed significantly. Use primarily for historical trend analysis.",
+    "operator_consolidation": "Many operators from 1999-2008 no longer exist. Industry consolidation has occurred. YPF, Pluspetrol, Total, Shell, Pan American Energy are key players across eras.",
+    "well_count_vs_production": "Well count alone doesn't indicate production levels. One high-rate well may outproduce 10 low-rate wells.",
+    "inactive_well_costs": "High shutin/reserve counts indicate high well carrying costs and potential reactivation opportunities.",
+    "injection_well_importance": "Active injection well count indicates maturity of secondary recovery operations. More injectors = more mature waterflood."
+  },
+
+  "data_integration": {
+    "matching_challenge": "No field_id in historical data. Must match to modern field database using field_name string matching with fuzzy logic.",
+    "time_gap": "This data ends at 2008. Modern well production data starts 2009. There's no overlap for validation.",
+    "use_for_trends": "Best use: long-term field development trends, historical operator activity, well count evolution over 1999-2008 period.",
+    "supplementary_only": "Treat as supplementary historical context, not primary data source for current operations."
+  },
+
+  "use_cases": {
+    "historical_trends": "Analyze field development history, well count growth patterns from 1999-2008",
+    "operator_history": "Track historical operator presence and consolidation patterns",
+    "field_maturity": "Identify fields with long production history vs newer developments",
+    "shutin_analysis": "Historical shutin patterns may indicate chronic issues or market dynamics",
+    "limited_value_for_current": "Low priority for current emissions/operations analysis - data too old"
+  },
+
+  "limitations": {
+    "outdated": "Data is 15-25 years old - operators, field names, and well counts have changed significantly",
+    "no_field_id": "Cannot directly join to modern data without name matching and validation",
+    "no_production_volumes": "Well counts only - no production rates or volumes",
+    "no_well_ids": "Cannot track individual wells - only aggregate counts by status",
+    "inconsistent_concepts": "Status concepts may not align perfectly with modern classification system",
+    "low_priority": "Low value for near-term operations, emissions estimation, or current field analysis"
+  },
+
+  "example_analysis": {
+    "total_active_wells_python": "df[df['status_concept'] == 'active_production'].groupby(['field_name', 'year', 'month'])['well_count'].sum()",
+    "active_fraction_python": "active_count / df.groupby(['field_name', 'year', 'month'])['well_count'].sum()",
+    "field_name_matching_python": "from fuzzywuzzy import fuzz; best_match = max(modern_fields, key=lambda x: fuzz.ratio(historical_name, x))",
+    "time_series_python": "df.groupby(['field_name', 'year'])['well_count'].sum().plot() # Track well count growth"
+  }
+}

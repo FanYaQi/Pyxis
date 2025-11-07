@@ -1,0 +1,142 @@
+{
+  "file_description": "Historical Oil Wells (Pre-2009) - Monthly well count by status, extraction method, and concept code",
+  "source_file_pattern": "pozos-productivos-de-petrleo-ant-2009.csv",
+  "output_file_name": "historical_oil_wells_pre2009_english.csv",
+  "data_format": "LONG format - multiple rows per field-month, one per concept code and extraction method",
+  "time_coverage": "1999-2008 (pre-2009 historical data)",
+  "priority": "LOW - Historical data, useful for long-term trend analysis but not critical for recent operations",
+  "use_case": "Historical well count trends, artificial lift evolution, operator consolidation history, field development patterns",
+
+  "column_mappings": {
+    "anio": "year",
+    "mes": "month",
+    "yacimiento": "field_name",
+    "provincia": "province",
+    "ubicacion": "location",
+    "concepto": "status_concept_code",
+    "tipoextraccion": "extraction_method",
+    "cantidad": "well_count",
+    "empresa": "company_name",
+    "fecha_data": "data_date"
+  },
+
+  "value_mappings": {
+    "location": {
+      "ON SHORE": "onshore",
+      "OFF SHORE": "offshore"
+    },
+    "status_concept_code": {
+      "1": "active_production",
+      "2": "temporarily_shut_in",
+      "3": "remote_areas_no_infrastructure",
+      "4": "shut_in_reserve",
+      "5": "other_inactive_reasons",
+      "6": "maintenance_or_issues"
+    },
+    "extraction_method": {
+      "Bombeo Mecanico": "mechanical_pump",
+      "Electro Sumergible": "electric_submersible_pump_esp",
+      "Cavidad Prograsiva": "progressive_cavity_pump_pcp",
+      "Gas Lift": "gas_lift",
+      "Surgencia Natural": "natural_flow",
+      "Bombeo Hidráulico": "hydraulic_pump",
+      "Plunger Lift": "plunger_lift",
+      "Parados": "shut_in_not_applicable"
+    }
+  },
+
+  "field_descriptions": {
+    "well_count": "Number of wells in the specified status and extraction method category for the field-month. Integer count.",
+    "status_concept_code": "Numeric code (1-6) indicating well operational status. Code 1 = active production with specified lift method. Codes 2-6 = various inactive statuses with extraction_method = 'Parados' (shut-in).",
+    "extraction_method": "Artificial lift method for active wells (concept=1) or 'Parados' (shut-in) for inactive wells (concept=2-6)",
+    "field_name": "Field name (yacimiento) - note: no field_id in historical data, matching to modern data requires name matching",
+    "data_date": "Date stamp of data entry - end of month"
+  },
+
+  "status_concept_descriptions": {
+    "active_production": "Concept code 1 - Wells actively producing oil with specified artificial lift method or natural flow. Contributing to monthly production.",
+    "temporarily_shut_in": "Concept code 2 - Wells temporarily shut in, capable of production but not currently flowing. Reasons: maintenance, equipment repair, market conditions.",
+    "remote_areas_no_infrastructure": "Concept code 3 - Wells in remote areas lacking pipeline infrastructure or gathering facilities. Cannot deliver production to market despite being capable.",
+    "shut_in_reserve": "Concept code 4 - Wells drilled and completed but held in reserve. Economic or strategic reasons. Not currently producing.",
+    "other_inactive_reasons": "Concept code 5 - Wells inactive for unspecified reasons. May include regulatory restrictions, legal issues, technical problems, or pending decisions.",
+    "maintenance_or_issues": "Concept code 6 - Wells under maintenance, workover, or experiencing equipment/operational issues. Expected to return to production."
+  },
+
+  "extraction_method_descriptions": {
+    "mechanical_pump": "Sucker rod pump (beam pump) - most common artificial lift method historically. Surface unit drives subsurface pump via reciprocating rods. Suitable for low-medium rates, viscous oil.",
+    "electric_submersible_pump_esp": "ESP - electric motor-driven centrifugal pump installed downhole. High-volume lift, handles water. Typical: 500-5000 bpd.",
+    "progressive_cavity_pump_pcp": "PCP - positive displacement pump with helical rotor. Excellent for viscous oil, sand production. Handles 10-2000 bpd.",
+    "gas_lift": "Inject high-pressure gas into production tubing to lighten fluid column. Versatile, reliable, handles high volumes.",
+    "natural_flow": "Well flows naturally without artificial lift - reservoir pressure sufficient. Most economical but typically depletes over time.",
+    "hydraulic_pump": "Hydraulic-powered subsurface pump using power fluid circulation. Used where electric power unavailable. Less common than ESP or mechanical pump.",
+    "plunger_lift": "Free-traveling piston cycles through tubing to lift liquids. Used in gas wells with liquid loading. Intermittent flow, low maintenance.",
+    "shut_in_not_applicable": "'Parados' - well is shut-in/stopped. No artificial lift system operating. Applies to concept codes 2-6."
+  },
+
+  "unit_notes": {
+    "well_count": "Integer count of wells - not production volumes",
+    "aggregation": "To get total active wells: sum all concept=1 across extraction methods. To get total wells: sum all concepts.",
+    "no_production_data": "This file contains well counts only, not production volumes or rates"
+  },
+
+  "data_quality_notes": {
+    "no_field_id": "Historical data lacks field_id. Must match to modern data using field_name string matching. Field names may have changed 1999-2008.",
+    "company_name_changes": "Company names reflect historical ownership. Many companies have merged, been acquired, or changed names since 1999-2008.",
+    "concept_code_interpretation": "Concept codes 1-6 are numeric, not well-documented. Interpretation based on data patterns and extraction method correlations.",
+    "spelling_variations": "Extraction method spellings may vary slightly (e.g., 'Prograsiva' vs 'Progresiva'). Standardize during translation.",
+    "zero_vs_null": "Zero well count may mean: (1) no wells in that status, (2) field not active that month, (3) data not reported.",
+    "data_completeness": "Pre-2009 data may have gaps. Data collection standards improved in later years."
+  },
+
+  "calculated_metrics": {
+    "total_active_wells": "SUM(well_count) WHERE status_concept_code = 1 - total producing wells",
+    "total_inactive_wells": "SUM(well_count) WHERE status_concept_code IN (2,3,4,5,6) - total non-producing wells",
+    "active_fraction": "total_active_wells / (total_active_wells + total_inactive_wells)",
+    "shutin_fraction": "total_inactive_wells / total_well_count - indicates reliability issues if high",
+    "mechanical_pump_fraction": "mechanical_pump_count / total_active_wells - indicates field maturity and depth",
+    "esp_fraction": "esp_count / total_active_wells - indicates high water cut or high-rate production",
+    "natural_flow_fraction": "natural_flow_count / total_active_wells - indicates young field or high reservoir pressure"
+  },
+
+  "technical_notes": {
+    "historical_context": "1999-2008 was pre-Vaca Muerta era - all conventional production. Shale development began ~2010.",
+    "artificial_lift_evolution": "Tracking lift method changes over time shows field maturity. New fields start with natural flow, transition to artificial lift as pressure depletes.",
+    "mechanical_pump_dominance": "Mechanical pumps dominated Argentina conventional oil production 1999-2008. Still common today for mature fields.",
+    "esp_adoption": "ESP adoption increased through 2000s as water cuts rose and higher rates needed. Now standard for high-volume wells.",
+    "data_vintage": "This data is 15-25 years old. Well counts, lift methods, and operators have changed significantly.",
+    "inactive_well_costs": "High inactive well counts (concepts 2-6) indicate high carrying costs and potential reactivation opportunities.",
+    "concept_code_limitation": "Numeric codes less intuitive than descriptive status names in modern data. Translation aids interpretation."
+  },
+
+  "data_integration": {
+    "matching_challenge": "No field_id in historical data. Must match to modern field database using field_name string matching with fuzzy logic.",
+    "time_gap": "This data ends at 2008. Modern well production data starts 2009. No overlap period for validation.",
+    "use_for_trends": "Best use: long-term artificial lift evolution, historical operator activity, well count growth 1999-2008.",
+    "supplementary_only": "Treat as supplementary historical context, not primary data source for current operations."
+  },
+
+  "use_cases": {
+    "artificial_lift_history": "Track evolution of lift methods over time - natural flow to mechanical pump to ESP/PCP adoption",
+    "field_maturity_analysis": "High mechanical pump fraction indicates mature field. High natural flow fraction indicates young field or pressure maintenance success.",
+    "operator_history": "Track historical operator presence and consolidation patterns from 1999-2008",
+    "shutin_trends": "Historical shutin patterns may indicate chronic field issues or market dynamics",
+    "limited_current_value": "Low priority for current emissions/operations analysis - data too old"
+  },
+
+  "limitations": {
+    "outdated": "Data is 15-25 years old - operators, field names, well counts, and lift methods have changed significantly",
+    "no_field_id": "Cannot directly join to modern data without name matching and validation",
+    "no_production_volumes": "Well counts only - no production rates or volumes to weight by importance",
+    "no_well_ids": "Cannot track individual wells - only aggregate counts by status and lift method",
+    "concept_codes_unclear": "Numeric concept codes (2-6) not well-documented. Interpretation based on patterns.",
+    "low_priority": "Low value for near-term operations, emissions estimation, or current field analysis"
+  },
+
+  "example_analysis": {
+    "total_active_wells_python": "df[df['status_concept_code'] == 1].groupby(['field_name', 'year', 'month'])['well_count'].sum()",
+    "lift_method_distribution_python": "df[df['status_concept_code'] == 1].groupby('extraction_method')['well_count'].sum().plot.pie()",
+    "active_fraction_python": "active = df[df['status_concept_code'] == 1]['well_count'].sum(); total = df['well_count'].sum(); fraction = active / total",
+    "field_name_matching_python": "from fuzzywuzzy import fuzz; best_match = max(modern_fields, key=lambda x: fuzz.ratio(historical_name, x))",
+    "lift_evolution_python": "df.pivot_table(values='well_count', index='year', columns='extraction_method', aggfunc='sum').plot()"
+  }
+}

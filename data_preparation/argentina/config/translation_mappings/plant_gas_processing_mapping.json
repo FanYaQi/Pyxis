@@ -1,0 +1,129 @@
+{
+  "file_description": "Plant Gas Processing - Monthly gas flows at processing plants including flaring",
+  "source_file_pattern": "gas-recibido-retenido-aventado-por-plantas.csv",
+  "output_file_name": "plant_gas_processing_english.csv",
+  "data_format": "LONG format - multiple rows per plant-month, one per concept",
+  "priority": "MEDIUM-HIGH - Contains flared gas data (aventado) critical for emissions, but plant-level not field-level",
+  "use_case": "Flaring emissions estimation, field fuel consumption, gas processing efficiency, operator flaring intensity",
+
+  "column_mappings": {
+    "anio": "year",
+    "mes": "month",
+    "idempresa": "company_id",
+    "idplanta": "plant_id",
+    "idprovincia": "province_id",
+    "idconcepto": "concept_id",
+    "cantidad": "quantity_mm3",
+    "observaciones": "notes",
+    "rectificado": "rectified",
+    "idgasretenidorecibidoaventadoplantas": "record_id",
+    "empresa": "company_name",
+    "concepto": "concept",
+    "planta": "plant_name",
+    "provincia": "province",
+    "fecha_data": "data_date"
+  },
+
+  "value_mappings": {
+    "concept": {
+      "Retenido en Plantas Propias (Mm3)": "gas_retained_own_plants_mm3",
+      "Retenido en Plantas de Terceros (Mm3)": "gas_retained_third_party_plants_mm3",
+      "Aventado (Mm3)": "gas_flared_mm3",
+      "Recibido de Terceros (Mm3)": "gas_received_third_parties_mm3",
+      "Consumo en Yacimiento (Mm3)": "field_fuel_consumption_mm3"
+    },
+    "rectified": {
+      "t": "true_rectified",
+      "f": "false_original"
+    }
+  },
+
+  "concept_descriptions": {
+    "gas_retained_own_plants_mm3": "Gas volume retained (processed) at company's own processing plants in million cubic meters (Mm3). This is sales gas after processing - NGLs removed, specifications met, ready for pipeline delivery.",
+    "gas_retained_third_party_plants_mm3": "Gas volume retained (processed) at third-party processing plants in Mm3. Company sends raw gas to another operator's plant for processing. Common in joint ventures or when lacking own processing capacity.",
+    "gas_flared_mm3": "Gas volume flared (burned without energy recovery) in Mm3. CRITICAL for emissions calculations. Flaring converts methane to CO2 but is waste of resource and contributes to GHG emissions. Minimize flaring is environmental and economic goal.",
+    "gas_received_third_parties_mm3": "Gas volume received from third-party operators for processing at this plant in Mm3. Company operates processing plant and receives raw gas from other operators. Revenue stream from processing fees.",
+    "field_fuel_consumption_mm3": "Gas consumed in field operations in Mm3. Includes: power generation, compression, heating, drilling rigs, well stimulation equipment. Also called 'lease fuel' or 'field fuel'. This is produced gas consumed before reaching sales point."
+  },
+
+  "unit_notes": {
+    "mm3": "Million cubic meters (Mm3) = 10^6 m3 - Argentina standard for gas volumes at processing plants",
+    "conversion_to_m3": "Mm3 to m3: multiply by 1,000,000",
+    "conversion_to_scf": "Mm3 to standard cubic feet (scf): multiply by 35,314,667",
+    "conversion_to_mcf": "Mm3 to thousand cubic feet (mcf): multiply by 35,315",
+    "flaring_emissions": "Flared gas emissions: ~50-55 kg CO2 per MMBtu (depends on combustion efficiency, typically 98%)"
+  },
+
+  "calculated_metrics": {
+    "total_gas_processed_mm3": "gas_retained_own_plants_mm3 + gas_retained_third_party_plants_mm3 - Total sales gas after processing",
+    "flaring_intensity_fraction": "gas_flared_mm3 / (gas_flared_mm3 + total_gas_processed_mm3 + field_fuel_consumption_mm3) - Fraction of produced gas that is flared",
+    "field_fuel_intensity_fraction": "field_fuel_consumption_mm3 / (total_gas_processed_mm3 + field_fuel_consumption_mm3) - Fraction consumed as fuel vs sold",
+    "flaring_co2_emissions_tons": "gas_flared_mm3 * 1e6 * gas_density_kg_per_m3 * heating_value_mmbtu_per_kg * 0.053 - Approximate CO2 emissions from flaring",
+    "monthly_flaring_rate_m3_per_day": "gas_flared_mm3 * 1e6 / days_in_month - Average daily flaring rate"
+  },
+
+  "technical_notes": {
+    "flaring_importance": "Gas flaring (aventado) is critical environmental metric. Flaring converts methane (GHG 28-36x more potent than CO2) to CO2 but wastes energy. Regulations increasingly restrict flaring.",
+    "flaring_reasons": "Common flaring reasons: (1) lack of processing/pipeline capacity, (2) gas composition doesn't meet pipeline specs, (3) safety relief during upsets, (4) startup/shutdown operations, (5) economic - gas value too low to justify processing costs",
+    "field_fuel_definition": "Field fuel consumption (consumo en yacimiento) is produced gas used in operations before sales point. Not sold, but not flared. Used productively for field operations.",
+    "processing_plant_role": "Processing plants separate NGLs (propane, butane, ethane) from methane, remove impurities (CO2, H2S, water), compress to pipeline pressure. Essential for gas commercialization.",
+    "third_party_processing": "Gas received from third parties indicates midstream business - company operates processing plant and charges fees to process other operators' gas.",
+    "retained_vs_produced": "'Retained' (retenido) means processed and sent to sales - does not mean physically stored. It's the volume commercialized."
+  },
+
+  "emissions_relevance": {
+    "flaring_emissions_priority": "HIGH - Direct GHG emissions source. Flaring converts CH4 to CO2 with ~98% combustion efficiency. Some methane slip (~2%) plus CO2 from combustion.",
+    "field_fuel_emissions": "MEDIUM - Fuel gas combustion emits CO2. Needed for operations but contributes to Scope 1 emissions. More efficient use reduces emissions intensity.",
+    "flaring_intensity_target": "World Bank Zero Routine Flaring initiative targets elimination of routine flaring by 2030. Argentina is signatory. Reducing flaring intensity critical for license to operate.",
+    "reporting_requirements": "Many regulations require flaring reporting. This data source provides official flaring volumes for compliance and emissions inventories.",
+    "comparison_to_satellite": "This reported flaring data should be validated against satellite-detected flares (VIIRS, Sentinel) for data quality and completeness checks."
+  },
+
+  "data_quality_notes": {
+    "plant_vs_field_level": "This is plant-level data, not field-level. Plants may process gas from multiple fields. Mapping flaring back to specific fields requires additional information.",
+    "zero_flaring": "Zero flaring is ideal but rare. Zero values may mean: (1) truly no flaring (excellent), (2) data not reported (concern), (3) flaring below reporting threshold.",
+    "rectified_flag": "rectificado = 't' means data was corrected/rectified after initial submission. Use rectified values when available.",
+    "field_fuel_variability": "Field fuel consumption varies with: drilling activity, artificial lift power needs, heating requirements (winter), compression needs.",
+    "plant_locations": "Plant locations (province) don't always match field locations if gas is piped to distant processing facilities."
+  },
+
+  "data_integration": {
+    "join_challenge": "Plant-level data difficult to map to field-level. Need operator-field-plant mapping table if available.",
+    "aggregate_by_operator": "Can aggregate flaring by operator (company_name) to assess operator flaring performance and intensity.",
+    "time_series_analysis": "Track flaring trends over time - increasing flaring indicates infrastructure constraints or field development outpacing midstream.",
+    "cross_reference_production": "Compare plant gas volumes to field production volumes to validate mass balance and identify discrepancies.",
+    "satellite_validation": "Cross-reference reported flaring with satellite flare detections (VIIRS Nightfire, Sentinel-5P TROPOMI) for quality control."
+  },
+
+  "use_cases": {
+    "flaring_emissions_calculation": "PRIMARY USE - Calculate CO2 and CH4 emissions from gas flaring for GHG inventory and carbon intensity",
+    "flaring_intensity_metrics": "Calculate operator-level flaring intensity (flared gas / produced gas) to rank operators and identify improvement opportunities",
+    "field_fuel_emissions": "Estimate Scope 1 emissions from field fuel combustion - power generation, compression, heating",
+    "regulatory_compliance": "Use for emissions reporting requirements and flaring reduction target tracking",
+    "operator_benchmarking": "Compare operators' flaring intensity and fuel consumption efficiency to identify best practices",
+    "temporal_trends": "Track flaring trends - increasing flaring may indicate infrastructure bottlenecks or regulatory non-compliance"
+  },
+
+  "limitations": {
+    "plant_level_not_field_level": "Major limitation - data is per plant, not per field. Cannot directly attribute flaring to specific fields without additional mapping",
+    "no_plant_locations": "Plant locations not provided as coordinates, only province. Cannot spatially map plants without geocoding plant names",
+    "no_flare_counts": "Volume only, not number of flares or flare events. Cannot distinguish routine vs non-routine flaring",
+    "no_reasons": "No information on why gas was flared - lack of capacity, composition issues, safety, economics, etc.",
+    "aggregation_challenges": "Aggregating to field-level requires operator-field-plant mapping which may not be available"
+  },
+
+  "typical_values": {
+    "flaring_good_practice": "Flaring intensity <1% of produced gas is good practice. <0.5% is excellent. >5% indicates issues.",
+    "field_fuel_typical": "Field fuel consumption typically 3-8% of gross gas production for conventional fields. Unconventional may be higher due to compression needs.",
+    "large_plant_throughput": "Large processing plants handle 50-500 Mm3/month. Small plants 5-50 Mm3/month.",
+    "flaring_targets": "World Bank Zero Routine Flaring: <1 m3 flared per m3 oil equivalent produced. Argentina improving but some operators still have work to do."
+  },
+
+  "example_analysis": {
+    "total_flaring_by_operator_python": "df[df['concept'] == 'gas_flared_mm3'].groupby('company_name')['quantity_mm3'].sum().sort_values(ascending=False)",
+    "flaring_intensity_python": "flared = df[df['concept'] == 'gas_flared_mm3']['quantity_mm3'].sum(); processed = df[df['concept'].str.contains('retained')]['quantity_mm3'].sum(); intensity = flared / (flared + processed)",
+    "monthly_flaring_trend_python": "df[df['concept'] == 'gas_flared_mm3'].groupby(['year', 'month'])['quantity_mm3'].sum().plot()",
+    "field_fuel_fraction_python": "fuel = df[df['concept'] == 'field_fuel_consumption_mm3']['quantity_mm3'].sum(); total = df['quantity_mm3'].sum(); fuel_fraction = fuel / total",
+    "co2_from_flaring_python": "# Approximate: flared_mm3 * 1e6 m3 * 0.75 kg/m3 gas * 40 MJ/kg LHV * 0.053 kg_CO2/MJ = tons CO2"
+  }
+}

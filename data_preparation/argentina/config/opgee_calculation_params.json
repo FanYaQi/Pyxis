@@ -1,0 +1,142 @@
+{
+  "_description": "Configuration parameters for OPGEE attribute calculations",
+  "_version": "1.0",
+  "_date": "2025-10-29",
+
+  "time_scope": {
+    "start_year": 2025,
+    "end_year": 2025,
+    "description": "Process 2025 data only (12 months) for initial testing"
+  },
+
+  "functional_unit_classification": {
+    "gor_threshold_scf_bbl": 10000,
+    "gor_threshold_m3_m3": 1781,
+    "description": "GOR threshold for oil vs gas field classification when field produces BOTH oil and gas",
+    "conversion_note": "1 scf/bbl = 0.1781 m³/m³",
+
+    "logic": {
+      "description": "Three-way classification logic based on which production files contain the field",
+      "rules": [
+        {
+          "condition": "Field only in oil production file (produccin-de-petrleo-por-yacimiento.csv)",
+          "result": "functional_unit = 'oil'",
+          "note": "No gas production or negligible gas"
+        },
+        {
+          "condition": "Field only in gas production file (produccin-de-gas-por-yacimiento.csv)",
+          "result": "functional_unit = 'gas'",
+          "note": "No oil production (pure gas field or condensate)"
+        },
+        {
+          "condition": "Field in BOTH files (has both oil and gas production)",
+          "calculation": "GOR = gas_prod_m3 / oil_prod_m3",
+          "result": "If GOR > 1,781 m³/m³ → 'gas', else → 'oil'",
+          "note": "Use threshold to determine which is dominant"
+        }
+      ]
+    },
+
+    "implementation_pseudocode": [
+      "# After merging oil and gas production files with outer join:",
+      "if pd.isna(gas_prod) or gas_prod == 0:",
+      "    functional_unit = 'oil'  # No gas production",
+      "elif pd.isna(oil_prod) or oil_prod == 0:",
+      "    functional_unit = 'gas'  # No oil production",
+      "else:",
+      "    gor = gas_prod_m3 / oil_prod_m3",
+      "    functional_unit = 'gas' if gor > 1781 else 'oil'"
+    ]
+  },
+
+  "gor_calculation": {
+    "formula": "gas_prod_m3 / oil_prod_m3",
+    "description": "Gas-to-Oil Ratio: volume of gas produced per volume of oil",
+    "units_input": "gas in m³, oil in m³",
+    "units_output": "m³ gas per m³ oil (dimensionless ratio)",
+    "source_files": {
+      "gas_prod": "produccin-de-gas-por-yacimiento.csv (sum of all gas pressure categories, converted from Mm³ to m³)",
+      "oil_prod": "produccin-de-petrleo-por-yacimiento.csv (sum of all production types: primary + secondary + assisted)"
+    },
+    "merge_key": ["field_id", "year", "month"],
+    "merge_type": "outer",
+    "note": "Outer join ensures we capture fields that only produce oil OR only produce gas"
+  },
+
+  "eor_detection": {
+    "steam_flooding_wir_threshold": 5.0,
+    "description": "WIR > 5 suggests steam flooding (high water injection)"
+  },
+
+  "unit_conversions": {
+    "oil_m3_to_bbl": 6.28981,
+    "gas_mm3_to_m3": 1000000,
+    "gas_km3_to_m3": 1000000000,
+    "scf_per_bbl_to_m3_per_m3": 0.1781,
+    "description": "Standard unit conversion factors"
+  },
+
+  "api_gravity": {
+    "formula": "(141.5 / specific_gravity) - 131.5",
+    "source": "Calculated from 'Densidad Media (Ton/m3)' in oil production file",
+    "temporal_nature": "TIME-VARYING - density changes month-to-month",
+    "note": "API gravity is NOT static - oil density can change over field lifetime",
+    "handling_missing": "If density is 0 or null, API will be null (only applies to gas-only fields)"
+  },
+
+  "attribute_temporality": {
+    "description": "Classification of attributes by how they vary over time",
+
+    "truly_static": {
+      "description": "Never change over field lifetime",
+      "attributes": ["basin", "province", "offshore", "country"],
+      "source": "capitulo-iv-pozos.csv or field production metadata"
+    },
+
+    "pseudo_static": {
+      "description": "May vary slightly but treated as constant for aggregation",
+      "attributes": ["depth", "latitude", "longitude"],
+      "source": "capitulo-iv-pozos.csv - aggregate to field level (average)",
+      "note": "Depth can vary across wells in a field but average is relatively stable"
+    },
+
+    "time_varying_field_level": {
+      "description": "Available in field production data, varies month-to-month",
+      "attributes": ["oil_prod", "gas_prod", "water_prod", "water_injected", "gas_injected", "density", "api", "primary_prod", "secondary_prod", "assisted_recovery", "gor", "wor", "wir"],
+      "source": "Field production files (already aggregated by government)",
+      "aggregation": "Use directly from field-month records (no additional aggregation needed)"
+    },
+
+    "time_varying_well_level": {
+      "description": "Aggregated from well-level data, varies month-to-month",
+      "attributes": ["num_prod_wells", "num_water_inj_wells", "num_gas_inj_wells", "extraction_method", "downhole_pump", "gas_lifting"],
+      "source": "Monthly well production files (produccin-de-pozos-2025.csv)",
+      "aggregation": "Group by (field_id, year, month) and count/aggregate"
+    }
+  },
+
+  "merge_strategy": {
+    "oil_gas_merge": {
+      "description": "Merge oil and gas production files to get complete picture",
+      "type": "outer",
+      "on": ["field_id", "year", "month"],
+      "rationale": "Outer join captures fields that only produce oil OR only produce gas",
+      "expected_results": {
+        "oil_only_fields": "gas_prod = null → functional_unit = 'oil'",
+        "gas_only_fields": "oil_prod = null → functional_unit = 'gas'",
+        "mixed_fields": "both not null → calculate GOR for classification"
+      }
+    }
+  },
+
+  "validation_rules": {
+    "oil_prod_bbl_min": 0,
+    "oil_prod_bbl_max": 1000000,
+    "gas_prod_m3_min": 0,
+    "api_gravity_min": 5,
+    "api_gravity_max": 60,
+    "gor_min": 0,
+    "gor_max": 100000,
+    "description": "Sanity check ranges for validated data quality"
+  }
+}

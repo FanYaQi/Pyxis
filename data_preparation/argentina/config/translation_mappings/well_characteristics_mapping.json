@@ -1,0 +1,126 @@
+{
+  "file_description": "Well Characteristics - Static well metadata and geometry",
+  "source_file_pattern": "capitulo-iv-pozos.csv",
+  "output_file_name": "well_characteristics_english.csv",
+  "data_format": "WIDE format - one row per well (static data)",
+
+  "column_mappings": {
+    "sigla": "well_name",
+    "idpozo": "well_id",
+    "area": "area_name",
+    "cod_area": "area_code",
+    "empresa": "company_name",
+    "yacimiento": "field_name",
+    "cod_yacimiento": "field_code",
+    "idareayacimiento": "field_id",
+    "formacion": "producing_formation",
+    "cuenca": "basin",
+    "provincia": "province",
+    "cota": "surface_elevation_m",
+    "profundidad": "total_depth_m",
+    "clasificacion": "well_classification",
+    "subclasificacion": "well_subclassification",
+    "tipo_recurso": "resource_type",
+    "sub_tipo_recurso": "resource_subtype",
+    "coord_x": "coordinate_x",
+    "coord_y": "coordinate_y",
+    "latitud": "latitude_decimal_degrees",
+    "longitud": "longitude_decimal_degrees",
+    "geojson": "well_location_geojson",
+    "tipopozo": "well_type",
+    "categoria": "well_category",
+    "estado": "well_state",
+    "profundidad_formacion": "formation_depth_m"
+  },
+
+  "value_mappings": {
+    "well_classification": {
+      "EXPLORACION": "exploration",
+      "EXPLOTACION": "production_development",
+      "AVANZADA": "appraisal",
+      "INYECCION": "injection",
+      "ABANDONO": "abandonment"
+    },
+    "well_subclassification": {
+      "EXPLORACION": "exploration_wildcat",
+      "DESARROLLO": "development",
+      "AVANZADA": "appraisal_delineation",
+      "DELIMITACION": "delineation_stepout",
+      "INYECCION": "injection_well"
+    },
+    "resource_type": {
+      "CONVENCIONAL": "conventional",
+      "NO CONVENCIONAL": "unconventional"
+    },
+    "resource_subtype": {
+      "CONVENCIONAL": "conventional",
+      "TIGHT": "tight_gas_oil",
+      "SHALE GAS": "shale_gas",
+      "SHALE OIL": "shale_oil",
+      "SHALE": "shale",
+      "CBM": "coalbed_methane",
+      "COAL BED METHANE": "coalbed_methane"
+    },
+    "well_type": {
+      "Petrolífero": "oil_well",
+      "Gasífero": "gas_well",
+      "Mixto": "oil_gas_well",
+      "Inyector": "injector",
+      "Inyector de Agua": "water_injector",
+      "Inyector de Gas": "gas_injector"
+    },
+    "well_state": {
+      "ACTIVO": "active",
+      "INACTIVO": "inactive",
+      "ABANDONADO": "abandoned",
+      "EN PERFORACION": "drilling",
+      "EN COMPLETACION": "completing"
+    }
+  },
+
+  "field_descriptions": {
+    "well_name": "Official well designation (sigla) - unique identifier following naming convention",
+    "well_id": "Numeric well identifier in government database",
+    "field_name": "Reservoir/field name (yacimiento) where well is located",
+    "producing_formation": "Primary producing geological formation name",
+    "basin": "Sedimentary basin - major geological province (e.g., Neuquina, Golfo San Jorge)",
+    "surface_elevation_m": "Ground level elevation above mean sea level in meters",
+    "total_depth_m": "Total measured depth of well from surface to bottom in meters",
+    "formation_depth_m": "Depth to top of producing formation in meters",
+    "well_location_geojson": "Well surface location in GeoJSON Point format with coordinates",
+    "resource_type": "Conventional (porous/permeable) or unconventional (tight/shale) classification",
+    "resource_subtype": "Specific unconventional play type if applicable"
+  },
+
+  "classification_descriptions": {
+    "exploration": "Wildcat well drilled to discover new oil/gas accumulations in unproven areas",
+    "production_development": "Well drilled to produce from known/proven reservoir - development drilling",
+    "appraisal": "Well drilled after discovery to evaluate reservoir size, productivity, and economics",
+    "delineation_stepout": "Well drilled to define lateral extent and boundaries of discovered reservoir",
+    "injection": "Well drilled or converted for fluid injection - water, gas, or CO2",
+    "abandonment": "Well being permanently plugged and abandoned per regulations"
+  },
+
+  "resource_type_descriptions": {
+    "conventional": "Porous and permeable reservoir rock - oil/gas flows naturally or with conventional lift. Permeability typically >1 millidarcy (mD).",
+    "unconventional": "Low permeability reservoir requiring hydraulic fracturing and horizontal drilling. Permeability typically <0.1 mD. Includes tight gas/oil, shale, and coalbed methane.",
+    "tight_gas_oil": "Low permeability sandstone or carbonate reservoirs - permeability 0.001-0.1 mD. Requires hydraulic fracturing but not as extensive as shale.",
+    "shale_gas": "Gas trapped in organic-rich shale formations (e.g., Vaca Muerta). Ultra-low permeability (<0.001 mD), requires multi-stage hydraulic fracturing in horizontal wells.",
+    "shale_oil": "Oil in shale formations - same characteristics as shale gas but liquid hydrocarbons. Vaca Muerta formation is Argentina's major shale oil play.",
+    "coalbed_methane": "Gas adsorbed onto coal surfaces - requires dewatering to reduce pressure and release gas. Different production mechanism than conventional gas."
+  },
+
+  "unit_notes": {
+    "meters": "All depth and elevation measurements in meters",
+    "decimal_degrees": "Latitude/longitude in decimal degrees format (WGS84 datum assumed)",
+    "coordinate_system": "Local projected coordinates - system varies by region/province",
+    "geojson_format": "Point geometry with [longitude, latitude] coordinate pair"
+  },
+
+  "technical_notes": {
+    "depth_conventions": "Total depth = measured depth along wellbore. True vertical depth (TVD) may be less for deviated/horizontal wells.",
+    "formation_depth": "Depth to top of primary producing interval - may have multiple zones",
+    "vaca_muerta_importance": "Vaca Muerta formation in Neuquina basin is world-class shale play - most unconventional wells target this formation",
+    "conventional_basins": "Golfo San Jorge and Austral basins are primarily conventional. Neuquina basin has both conventional and unconventional (Vaca Muerta)."
+  }
+}

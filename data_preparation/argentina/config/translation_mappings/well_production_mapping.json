@@ -1,0 +1,130 @@
+{
+  "file_description": "Well Production - Monthly well-level production data (all years)",
+  "source_file_pattern": "produccin-de-pozos-de-gas-y-petrleo-*.csv",
+  "output_file_pattern": "well_production_{year}_english.csv",
+  "data_format": "WIDE format - one row per well-month",
+  "years_available": "2009-2025 (multiple files, one per year)",
+
+  "column_mappings": {
+    "idempresa": "company_id",
+    "anio": "year",
+    "mes": "month",
+    "idpozo": "well_id",
+    "prod_pet": "oil_production_m3",
+    "prod_gas": "gas_production_km3",
+    "prod_agua": "water_production_m3",
+    "iny_agua": "water_injection_m3",
+    "iny_gas": "gas_injection_km3",
+    "iny_co2": "co2_injection_km3",
+    "iny_otro": "other_injection_km3",
+    "tef": "tef",
+    "vida_util": "productive_life_days",
+    "tipoextraccion": "extraction_method",
+    "tipoestado": "well_status",
+    "tipopozo": "well_type",
+    "observaciones": "notes",
+    "fechaingreso": "entry_date",
+    "rectificado": "rectified",
+    "habilitado": "enabled",
+    "idareayacimiento": "field_id",
+    "sigla": "well_name",
+    "empresa": "company_name",
+    "areayacimiento": "field_name",
+    "cuenca": "basin",
+    "provincia": "province",
+    "ubicacion": "location"
+  },
+
+  "value_mappings": {
+    "extraction_method": {
+      "Bombeo Mecánico": "mechanical_pump",
+      "Bombeo Electrosumergible": "electric_submersible_pump_esp",
+      "Bombeo por Cavidades Progresivas": "progressive_cavity_pump_pcp",
+      "Gas Lift": "gas_lift",
+      "Extracción con gas": "gas_lift",
+      "Surgencia Natural": "natural_flow",
+      "Plunger Lift": "plunger_lift",
+      "Otros Tipos de Extracción": "other_artificial_lift",
+      "Sin Sistema de Extracción": "no_artificial_lift"
+    },
+    "well_status": {
+      "Extracción Efectiva": "producing",
+      "Extracción c/Problems de Equipos": "producing_equipment_issues",
+      "Extracción c/Problems Operativos": "producing_operational_issues",
+      "En Inyección Efectiva": "injecting_active",
+      "En Inyección Efectiva de Agua": "water_injection_active",
+      "En Inyección Efectiva de Gas": "gas_injection_active",
+      "En Inyección Efectiva de CO2": "co2_injection_active",
+      "En Inyección c/Problems de Equipos": "injecting_equipment_issues",
+      "En Inyección c/Problems Operativos": "injecting_operational_issues",
+      "En Espera": "waiting_completion",
+      "En Estudio": "under_evaluation",
+      "En Reserva de Gas": "shut_in_gas_reserve",
+      "En Reserva de Petróleo": "shut_in_oil_reserve",
+      "Abandonado": "permanently_abandoned",
+      "Anulado": "cancelled_annulled",
+      "Suspendido Transitoriamente": "temporarily_suspended",
+      "Suspendido Por Inyección": "suspended_for_injection",
+      "Taponado Transitoriamente": "temporarily_plugged",
+      "Taponado": "permanently_plugged"
+    },
+    "well_type": {
+      "Petrolífero": "oil_well",
+      "Gasífero": "gas_well",
+      "Mixto": "oil_gas_well",
+      "Inyector de Agua": "water_injector",
+      "Inyector de Gas": "gas_injector",
+      "Inyector de CO2": "co2_injector",
+      "Otro": "other_purpose"
+    },
+    "location": {
+      "On Shore": "onshore",
+      "Off Shore": "offshore"
+    }
+  },
+
+  "extraction_method_descriptions": {
+    "mechanical_pump": "Sucker rod pump (beam pump, walking beam) - most common artificial lift. Surface unit drives subsurface pump via reciprocating sucker rods. Suitable for low-medium rates, high viscosity. Typical depth: 500-3000m.",
+    "electric_submersible_pump_esp": "ESP - electric motor-driven multistage centrifugal pump installed downhole. High-volume lift, handles water, temperature-limited. Typical: 500-5000 bpd, depth to 3000m.",
+    "progressive_cavity_pump_pcp": "PCP - positive displacement pump with helical rotor rotating inside elastomer stator. Excellent for viscous oil, sand production. Handles 10-2000 bpd.",
+    "gas_lift": "Inject high-pressure gas into production tubing to lighten fluid column and enable flow. Versatile, reliable, handles high volumes. Requires gas availability and compression.",
+    "natural_flow": "Well flows naturally without artificial lift - reservoir pressure sufficient to overcome wellbore pressure and surface backpressure. Most economical but typically depletes over time.",
+    "plunger_lift": "Free-traveling piston (plunger) cycles up and down tubing to lift liquids. Used in gas wells with liquid loading. Intermittent flow, low maintenance.",
+    "other_artificial_lift": "Other methods: hydraulic pump, jet pump, or hybrid systems. Less common, specialized applications.",
+    "no_artificial_lift": "Well not equipped with lift system - may be shut-in, under evaluation, or awaiting installation."
+  },
+
+  "well_status_descriptions": {
+    "producing": "Well actively producing oil or gas - normal operations",
+    "producing_equipment_issues": "Producing but with equipment problems - reduced efficiency, repair needed",
+    "producing_operational_issues": "Producing but with operational problems - well performance issues, not equipment",
+    "injecting_active": "Well actively injecting fluids - water, gas, or CO2",
+    "water_injection_active": "Active water injection for pressure maintenance (waterflooding) or disposal",
+    "gas_injection_active": "Active gas injection for pressure maintenance, gas cycling, or EOR",
+    "co2_injection_active": "Active CO2 injection for EOR (miscible flooding) or storage/sequestration",
+    "waiting_completion": "Drilled well waiting for completion, stimulation, or tie-in",
+    "under_evaluation": "Well status under evaluation - testing, analysis, or decision pending",
+    "shut_in_gas_reserve": "Gas well capable of production but held in reserve - market conditions or regulatory",
+    "shut_in_oil_reserve": "Oil well capable of production but held in reserve - economic or regulatory",
+    "permanently_abandoned": "Well permanently plugged and abandoned per regulations - no future use",
+    "temporarily_suspended": "Production temporarily suspended - market, maintenance, or operational reasons",
+    "temporarily_plugged": "Well temporarily plugged - can be restored to production if needed"
+  },
+
+  "unit_notes": {
+    "m3": "Cubic meters - volume for oil and water",
+    "km3": "Thousand cubic meters (km3) = 10^3 m3 - volume for gas (NOTE: different from Mm3 in field production!)",
+    "oil_conversion": "m3 to barrels (bbl): multiply by 6.28981",
+    "gas_conversion": "km3 to m3: multiply by 1000",
+    "important": "Well production uses km3 for gas, field production uses Mm3 - be careful!"
+  },
+
+  "technical_notes": {
+    "artificial_lift_selection": "Lift method depends on: reservoir depth, fluid properties (viscosity, gas content), production rate, water cut, sand production, and economic factors",
+    "esp_advantages": "High volume capability, good for high water cut, relatively efficient",
+    "esp_limitations": "Temperature-sensitive (elastomers), gas handling issues, electricity required downhole",
+    "pcp_advantages": "Handles viscous oil, sand, and solids well, good efficiency",
+    "gas_lift_advantages": "Versatile, reliable, handles wide range of rates, good for deep wells",
+    "mechanical_pump_advantages": "Simple, robust, widely applicable, easy to service, handles viscous oil"
+  }
+}
