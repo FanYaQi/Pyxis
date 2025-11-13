@@ -1,7 +1,7 @@
 """
 Comprehensive Raw Data Translation with O&G Domain Knowledge
 
-This script translates ALL 10 raw Argentina data files from Spanish to English using
+This script translates ALL 12 raw Argentina data files from Spanish to English using
 comprehensive mappings with oil & gas domain knowledge. It translates:
 - Column names (Spanish → English with UNITS PRESERVED: m3, mm3, psi, hp, tons, etc.)
 - Data values (Spanish → English with meaningful O&G terminology)
@@ -14,9 +14,11 @@ FILES TRANSLATED:
     5. Fracture/completion data (NEW - hydraulic fracturing details) - psi, hp, tons
     6. Field shapes & depth (NEW - GeoJSON boundaries, depth) - meters
     7. Daily oil production (average daily rates) - m3/day
-    8. Plant gas processing (includes FLARING data) - Mm3
-    9. Historical gas wells pre-2009 (well counts by status)
-    10. Historical oil wells pre-2009 (well counts by lift method)
+    8. Daily gas production (average daily rates) - Mm3/day
+    9. Field production by formation & well vintage (includes INJECTION data) - m3, km3
+    10. Plant gas processing (includes FLARING data) - Mm3
+    11. Historical gas wells pre-2009 (well counts by status)
+    12. Historical oil wells pre-2009 (well counts by lift method)
 
 MAPPINGS:
     Translation mappings are defined in config/translation_mappings/
@@ -180,6 +182,62 @@ def extract_year_from_filename(filename: str) -> str:
     return match.group(1) if match else 'unknown'
 
 
+def translate_year_suffixed_files(
+    raw_dir: Path,
+    translated_dir: Path,
+    mapping: Dict[str, Any],
+    pattern: str,
+    output_prefix: str,
+    full_translation: bool = False,
+    max_rows_default: int = 100000
+):
+    """
+    Translate all files matching a pattern with year suffixes (handles year-specific and year-range files).
+
+    Args:
+        raw_dir: Raw data directory
+        translated_dir: Output directory
+        mapping: Translation mapping
+        pattern: Glob pattern to match files (e.g., "produccin-de-petrleo-por-yacimiento*.csv")
+        output_prefix: Prefix for output files (e.g., "oil_field_production")
+        full_translation: If True, translate full files. If False, use samples.
+        max_rows_default: Default max rows for sampling
+    """
+
+    print(f"\n{'='*70}")
+    print(f"{pattern.upper().replace('*.CSV', '')} (All Versions)")
+    print(f"{'='*70}")
+
+    # Find all files matching pattern
+    matched_files = list(raw_dir.glob(pattern))
+
+    if not matched_files:
+        print(f"  ⚠️  No files matching pattern: {pattern}")
+        return
+
+    print(f"  Found {len(matched_files)} file(s)")
+
+    for input_file in sorted(matched_files):
+        # Extract year or year range from filename
+        # Handles: filename.csv, filename_2024.csv, filename-2024.csv, filename_2024-2025.csv
+        # Match either underscore or hyphen before year
+        year_match = re.search(r'[-_](\d{4}(?:-\d{4})?)\.csv$', input_file.name)
+
+        if year_match:
+            year_suffix = year_match.group(1)
+            output_name = f"{output_prefix}_{year_suffix}_english.csv"
+        else:
+            # No year suffix - use mapping's default output name
+            output_name = mapping.get('output_file_name', f"{output_prefix}_english.csv")
+
+        output_file = translated_dir / output_name
+
+        # Use sample for large files unless full_translation requested
+        max_rows = None if full_translation else max_rows_default
+
+        translate_file(input_file, output_file, mapping, max_rows=max_rows)
+
+
 def translate_well_production_files(
     raw_dir: Path,
     translated_dir: Path,
@@ -195,30 +253,15 @@ def translate_well_production_files(
         mapping: Well production mapping
         full_translation: If True, translate full files. If False, use samples.
     """
-
-    print(f"\n{'='*70}")
-    print(f"WELL PRODUCTION FILES (All Years)")
-    print(f"{'='*70}")
-
-    # Find all well production files
-    pattern = "produccin-de-pozos-de-gas-y-petrleo-*.csv"
-    well_files = list(raw_dir.glob(pattern))
-
-    if not well_files:
-        print(f"  ⚠️  No files matching pattern: {pattern}")
-        return
-
-    print(f"  Found {len(well_files)} well production file(s)")
-
-    for well_file in sorted(well_files):
-        year = extract_year_from_filename(well_file.name)
-        output_name = f"well_production_{year}_english.csv"
-        output_file = translated_dir / output_name
-
-        # Use sample for large files unless full_translation requested
-        max_rows = None if full_translation else 100000
-
-        translate_file(well_file, output_file, mapping, max_rows=max_rows)
+    translate_year_suffixed_files(
+        raw_dir=raw_dir,
+        translated_dir=translated_dir,
+        mapping=mapping,
+        pattern="produccin-de-pozos-de-gas-y-petrleo-*.csv",
+        output_prefix="well_production",
+        full_translation=full_translation,
+        max_rows_default=100000
+    )
 
 
 # ============================================================================
@@ -259,29 +302,33 @@ def main():
         print("ℹ️  MODE: SAMPLE TRANSLATION (faster, smaller files for testing)")
 
     # ========================================================================
-    # 1. Oil Field Production
+    # 1. Oil Field Production (handles year-suffixed files)
     # ========================================================================
 
     if 'oil_field_production_mapping' in mappings:
-        mapping = mappings['oil_field_production_mapping']
-        translate_file(
-            input_file=raw_dir / "produccin-de-petrleo-por-yacimiento.csv",
-            output_file=translated_dir / mapping['output_file_name'],
-            mapping=mapping,
-            max_rows=None if FULL_TRANSLATION else 100000
+        translate_year_suffixed_files(
+            raw_dir=raw_dir,
+            translated_dir=translated_dir,
+            mapping=mappings['oil_field_production_mapping'],
+            pattern="produccin-de-petrleo-por-yacimiento*.csv",
+            output_prefix="oil_field_production",
+            full_translation=FULL_TRANSLATION,
+            max_rows_default=100000
         )
 
     # ========================================================================
-    # 2. Gas Field Production
+    # 2. Gas Field Production (handles year-suffixed files)
     # ========================================================================
 
     if 'gas_field_production_mapping' in mappings:
-        mapping = mappings['gas_field_production_mapping']
-        translate_file(
-            input_file=raw_dir / "produccin-de-gas-por-yacimiento.csv",
-            output_file=translated_dir / mapping['output_file_name'],
-            mapping=mapping,
-            max_rows=None if FULL_TRANSLATION else 100000
+        translate_year_suffixed_files(
+            raw_dir=raw_dir,
+            translated_dir=translated_dir,
+            mapping=mappings['gas_field_production_mapping'],
+            pattern="produccin-de-gas-por-yacimiento*.csv",
+            output_prefix="gas_field_production",
+            full_translation=FULL_TRANSLATION,
+            max_rows_default=100000
         )
 
     # ========================================================================
@@ -349,7 +396,33 @@ def main():
         )
 
     # ========================================================================
-    # 8. Plant Gas Processing (Includes FLARING data)
+    # 8. Daily Gas Production
+    # ========================================================================
+
+    if 'daily_gas_production_mapping' in mappings:
+        mapping = mappings['daily_gas_production_mapping']
+        translate_file(
+            input_file=raw_dir / "produccin-de-gas-promedio-diaria-por-yacimiento.csv",
+            output_file=translated_dir / mapping['output_file_name'],
+            mapping=mapping,
+            max_rows=None if FULL_TRANSLATION else 50000
+        )
+
+    # ========================================================================
+    # 9. Field Production by Formation & Well Vintage (NEW - INCLUDES INJECTION)
+    # ========================================================================
+
+    if 'field_production_by_formation_vintage_mapping' in mappings:
+        mapping = mappings['field_production_by_formation_vintage_mapping']
+        translate_file(
+            input_file=raw_dir / "produccin-de-petrleo-y-gas-captulo-iv-por-yacimiento-y-antigedad-de-pozo-productivo.csv",
+            output_file=translated_dir / mapping['output_file_name'],
+            mapping=mapping,
+            max_rows=None if FULL_TRANSLATION else 100000
+        )
+
+    # ========================================================================
+    # 10. Plant Gas Processing (Includes FLARING data)
     # ========================================================================
 
     if 'plant_gas_processing_mapping' in mappings:
@@ -362,7 +435,7 @@ def main():
         )
 
     # ========================================================================
-    # 9. Historical Gas Wells (Pre-2009) - OPTIONAL
+    # 11. Historical Gas Wells (Pre-2009) - OPTIONAL
     # ========================================================================
 
     if 'historical_gas_wells_mapping' in mappings:
@@ -375,7 +448,7 @@ def main():
         )
 
     # ========================================================================
-    # 10. Historical Oil Wells (Pre-2009) - OPTIONAL
+    # 12. Historical Oil Wells (Pre-2009) - OPTIONAL
     # ========================================================================
 
     if 'historical_oil_wells_mapping' in mappings:

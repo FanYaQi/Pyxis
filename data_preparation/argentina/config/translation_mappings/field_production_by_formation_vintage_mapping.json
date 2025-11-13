@@ -1,0 +1,181 @@
+{
+  "file_description": "Field Production by Formation and Well Vintage - Monthly oil/gas production and water/gas/CO2 injection data grouped by field, geological formation, and well vintage (first production date)",
+  "source_file_pattern": "produccin-de-petrleo-y-gas-captulo-iv-por-yacimiento-y-antigedad-de-pozo-productivo.csv",
+  "output_file_name": "field_production_by_formation_vintage_english.csv",
+  "data_format": "LONG format - one row per company-field-formation-vintage-month combination",
+  "priority": "HIGH - Critical for OPGEE modeling (water injection, CO2-EOR, formation-level analysis)",
+  "use_case": "Calculate WOR, WIR, gas injection ratios, CO2-EOR operations, track production by well vintage and formation, reservoir characterization",
+
+  "column_mappings": {
+    "idempresa": "company_id",
+    "anio": "year",
+    "mes": "month",
+    "suma_prod_pet": "oil_production_m3",
+    "suma_prod_gas": "gas_production_km3",
+    "suma_prod_agua": "water_production_m3",
+    "suma_iny_agua": "water_injection_m3",
+    "suma_iny_gas": "gas_injection_km3",
+    "suma_iny_co2": "co2_injection_m3",
+    "suma_iny_otro": "other_injection_m3",
+    "empresa": "company_name",
+    "formacion": "formation_name",
+    "idareapermisoconcesion": "permit_area_id",
+    "areapermisoconcesion": "permit_area_name",
+    "idareayacimiento": "field_id",
+    "areayacimiento": "field_name",
+    "cuenca": "basin",
+    "provincia": "province",
+    "tipo_de_recurso": "resource_type",
+    "anio_primera_prod": "well_vintage_year",
+    "mes_primera_prod": "well_vintage_month"
+  },
+
+  "value_mappings": {
+    "resource_type": {
+      "CONVENCIONAL": "Conventional",
+      "NO CONVENCIONAL": "Unconventional",
+      "NO DISCRIMINADO": "Not Discriminated",
+      "SIN RESERVORIO": "No Reservoir"
+    }
+  },
+
+  "field_descriptions": {
+    "oil_production_m3": "Total oil production in cubic meters for wells of this vintage in this formation during the month",
+    "gas_production_km3": "Total gas production in thousand cubic meters (km3) for wells of this vintage in this formation during the month",
+    "water_production_m3": "Total water production (produced water) in cubic meters - includes formation water and injected water breakthrough",
+    "water_injection_m3": "Total water injected in cubic meters - for waterflooding, pressure maintenance, or disposal",
+    "gas_injection_km3": "Total gas injected in thousand cubic meters (km3) - for gas flooding, pressure maintenance, or gas cycling",
+    "co2_injection_m3": "Total CO2 injected in cubic meters - for CO2-EOR (enhanced oil recovery) operations",
+    "other_injection_m3": "Other fluid injection in cubic meters - may include nitrogen, polymers, or other EOR fluids",
+    "formation_name": "Geological formation/reservoir name - critical for reservoir characterization and production modeling",
+    "well_vintage_year": "Year when wells in this cohort first started production - enables decline curve analysis by vintage",
+    "well_vintage_month": "Month when wells in this cohort first started production",
+    "resource_type": "Type of hydrocarbon resource: Conventional (traditional reservoirs) or Unconventional (tight oil/gas, shale)"
+  },
+
+  "unit_notes": {
+    "oil_production_m3": "Cubic meters (m3) - monthly total for this field-formation-vintage group",
+    "gas_production_km3": "Thousand cubic meters (km3 = 10^3 m3) - monthly total. To convert to Mm3: divide by 1000",
+    "water_volumes_m3": "All water volumes (production and injection) in cubic meters (m3)",
+    "co2_injection_m3": "CO2 injection in cubic meters at standard conditions",
+    "oil_conversion_bbl": "m3 to barrels: multiply by 6.28981",
+    "gas_conversion_scf": "km3 to scf: multiply by 35,314.7 (since 1 km3 = 1000 m3, and 1 m3 = 35.3147 scf)",
+    "gas_conversion_mcf": "km3 to Mcf: multiply by 35.3147"
+  },
+
+  "calculated_metrics": {
+    "wor_water_oil_ratio": "water_production_m3 / oil_production_m3 - Critical OPGEE input for water treatment energy",
+    "wir_water_injection_ratio": "water_injection_m3 / oil_production_m3 - Indicates secondary recovery intensity",
+    "gor_gas_oil_ratio": "(gas_production_km3 * 1000) / oil_production_m3 - Gas-to-oil ratio in m3/m3 (convert to scf/bbl for OPGEE)",
+    "gir_gas_injection_ratio": "(gas_injection_km3 * 1000) / oil_production_m3 - Gas injection per barrel of oil produced",
+    "co2_injection_ratio": "co2_injection_m3 / oil_production_m3 - CO2 injected per barrel for EOR",
+    "water_injection_fraction": "water_injection_m3 / (water_injection_m3 + water_production_m3) - Fraction of water cycled",
+    "net_water_production": "water_production_m3 - water_injection_m3 - Net water requiring disposal",
+    "field_age_at_production": "year - well_vintage_year - Age of well cohort at time of production (for decline analysis)",
+    "is_secondary_recovery": "water_injection_m3 > 0 OR gas_injection_km3 > 0 - Binary flag for enhanced recovery",
+    "is_co2_eor": "co2_injection_m3 > 0 - Binary flag for CO2 enhanced oil recovery"
+  },
+
+  "data_quality_validation": {
+    "zero_production_check": "Rows with zero oil AND zero gas production may indicate injection-only wells or data errors",
+    "injection_without_production": "Water/gas injection without corresponding production may indicate pilot testing or data issues",
+    "negative_values": "All production and injection values should be >= 0. Negative values indicate data errors.",
+    "unrealistic_ratios": "WOR > 50 or WIR > 10 may indicate data quality issues or extreme recovery scenarios",
+    "formation_consistency": "Formation names should be consistent within a field. Check for spelling variations.",
+    "vintage_validation": "well_vintage_year should be <= production year. Future vintages indicate data errors.",
+    "co2_presence": "CO2 injection should correlate with known CO2-EOR projects. Unexpected CO2 values warrant investigation."
+  },
+
+  "technical_notes": {
+    "well_vintage_concept": "Wells are grouped by their first production date (vintage). Enables tracking production decline by cohort age and formation.",
+    "formation_importance": "Different formations have vastly different production characteristics. Critical for reservoir modeling and OPGEE inputs.",
+    "water_injection_purpose": "Water injection used for: (1) Waterflooding (secondary recovery), (2) Pressure maintenance, (3) Produced water disposal",
+    "gas_injection_purpose": "Gas injection used for: (1) Gas cycling, (2) Pressure maintenance, (3) Gas flooding EOR",
+    "co2_eor_operations": "CO2 injection indicates enhanced oil recovery operations. Requires CO2 source tracking for carbon intensity.",
+    "wor_evolution": "WOR typically increases over field life as water cut rises. Critical for operating cost and emissions modeling.",
+    "secondary_recovery": "High water or gas injection relative to production indicates secondary/tertiary recovery operations.",
+    "produced_water": "Includes both formation water and breakthrough of injected water. Requires energy-intensive treatment/disposal.",
+    "decline_curve_analysis": "Tracking production by vintage enables decline curve fitting and EUR (estimated ultimate recovery) calculations.",
+    "conventional_vs_unconventional": "Unconventional resources (Vaca Muerta shale) have steeper decline curves but respond differently to EOR."
+  },
+
+  "data_integration": {
+    "join_key": "field_id + year + month - can aggregate to field level by summing across formations and vintages",
+    "formation_rollup": "Sum across all formations and vintages to get total field production (compare with other production files)",
+    "vintage_rollup": "Sum across all vintages to get total production by formation",
+    "cross_validation": "Total production (summed) should match totals in oil_field_production and gas_field_production files",
+    "time_series_by_vintage": "Track individual vintage cohorts over time to model decline curves",
+    "opgee_aggregation": "For OPGEE, typically aggregate to field level but retain formation mix for reservoir modeling"
+  },
+
+  "opgee_critical_inputs": {
+    "wor_calculation": "WOR = water_production / oil_production - Critical for water treatment energy calculations in OPGEE",
+    "wir_calculation": "WIR = water_injection / oil_production - For secondary recovery modeling",
+    "water_treatment_energy": "Higher WOR means more produced water requiring separation, treatment, and disposal (energy intensive)",
+    "water_injection_energy": "Water injection requires pumping energy proportional to WIR and injection pressure",
+    "gas_flooding_indicator": "gas_injection_km3 > 0 indicates gas flooding operations (affects gas balance in OPGEE)",
+    "co2_eor_carbon_intensity": "CO2 injection for EOR has major CI implications. Need to track CO2 source (natural vs anthropogenic).",
+    "secondary_recovery_flag": "Fields with injection operations have different energy profiles than primary recovery",
+    "formation_specific_parameters": "Different formations may have different API gravity, GOR, pressure, temperature - affects OPGEE inputs"
+  },
+
+  "use_cases": {
+    "wor_wir_calculation": "PRIMARY USE - Calculate water-oil ratio and water injection ratio for OPGEE modeling",
+    "formation_characterization": "Understand which formations contribute most to production and their characteristics",
+    "vintage_decline_analysis": "Track production decline by well cohort age - enables forecasting and EUR estimation",
+    "secondary_recovery_identification": "Identify fields using waterflooding, gas flooding, or CO2-EOR",
+    "water_management": "Calculate net water production requiring disposal vs water recycled via injection",
+    "co2_eor_tracking": "Identify and quantify CO2-EOR operations for carbon intensity assessment",
+    "reservoir_modeling": "Formation-level production data enables multi-layer reservoir modeling",
+    "operator_benchmarking": "Compare WOR, WIR, and recovery efficiency across operators and basins",
+    "production_forecasting": "Use vintage-based decline curves to forecast future production"
+  },
+
+  "limitations": {
+    "aggregated_by_vintage": "Data aggregated across all wells of same vintage in same formation. Individual well data not available.",
+    "formation_name_variations": "Formation names may have spelling variations or inconsistencies. Requires cleaning.",
+    "no_injection_well_counts": "Shows injection volumes but not number of injection wells",
+    "no_pressure_data": "Injection pressures not provided - important for energy calculations",
+    "gas_unit_mismatch": "Gas in km3 while oil/water in m3. Requires unit conversion for ratio calculations.",
+    "other_injection_undefined": "Other injection type not specified - could be nitrogen, polymer, or other EOR fluids",
+    "monthly_aggregation": "Monthly totals may mask intra-month variability in injection operations"
+  },
+
+  "typical_values": {
+    "wor_primary_recovery": "0.1-2.0 for primary recovery. WOR increases over field life.",
+    "wor_secondary_recovery": "2.0-20.0 for mature waterflooded fields. Can exceed 50 in late life.",
+    "wir_waterflooding": "0.5-3.0 typical for waterflooding operations. Varies with recovery efficiency.",
+    "gor_oil_fields": "50-500 m3_gas/m3_oil typical for associated gas. Higher for gas condensate.",
+    "co2_injection_eor": "0.3-0.6 m3_CO2/m3_oil typical for CO2-EOR projects at steady state",
+    "gas_injection_cycling": "Gas cycling projects may inject 80-95% of produced gas",
+    "conventional_argentina": "Most Argentina production is conventional (Neuquina basin)",
+    "unconventional_vaca_muerta": "Vaca Muerta (unconventional) has lower WOR initially but steeper decline",
+    "major_formations": "Key formations: Vaca Muerta, Quintuco, Mulichinco, Agrio, Troncoso, Barrancas"
+  },
+
+  "example_analysis": {
+    "calculate_wor_python": "wor = water_production_m3 / oil_production_m3 if oil_production_m3 > 0 else None",
+    "calculate_wir_python": "wir = water_injection_m3 / oil_production_m3 if oil_production_m3 > 0 else None",
+    "calculate_gor_python": "gor_m3_m3 = (gas_production_km3 * 1000) / oil_production_m3 if oil_production_m3 > 0 else None\ngor_scf_bbl = gor_m3_m3 * (35.3147 / 6.28981)  # Convert to scf/bbl",
+    "net_water_production_python": "net_water = water_production_m3 - water_injection_m3",
+    "identify_secondary_recovery_python": "is_secondary_recovery = (water_injection_m3 > 0) or (gas_injection_km3 > 0)",
+    "identify_co2_eor_python": "is_co2_eor = co2_injection_m3 > 0",
+    "vintage_age_python": "vintage_age_years = year - well_vintage_year",
+    "aggregate_to_field_python": "field_total = df.groupby(['field_id', 'year', 'month']).agg({\n    'oil_production_m3': 'sum',\n    'water_production_m3': 'sum',\n    'water_injection_m3': 'sum'\n}).reset_index()"
+  },
+
+  "data_timeline": {
+    "start_date": "2010-01 (January 2010)",
+    "end_date": "Check last row for most recent data",
+    "well_vintages": "Wells first production dates range from early 2000s to present",
+    "historical_coverage": "Captures production from wells drilled over 15+ year period"
+  },
+
+  "quality_checks": {
+    "formation_name_cleaning": "Standardize formation names (lowercase, remove special characters, handle common variations)",
+    "vintage_plausibility": "Check that well_vintage_year <= production year and well_vintage_year >= 2000 (or earlier for old fields)",
+    "production_injection_balance": "For closed systems, cumulative injection should be similar to cumulative production over time",
+    "zero_value_interpretation": "Zero injection is normal (primary recovery). Zero production with injection indicates injection-only operations.",
+    "co2_project_verification": "Cross-reference CO2 injection with known CO2-EOR projects in Argentina"
+  }
+}

@@ -10,6 +10,9 @@ h3 = "*"
 shapely = "*"
 pyproj = "*"
 python-dateutil = "*"
+matplotlib = "*"
+seaborn = "*"
+requests = "*"
 
 [dev-packages]
 black = "*"

@@ -1,0 +1,124 @@
+{
+  "file_description": "Daily Gas Production - Average daily gas production rate by field",
+  "source_file_pattern": "produccin-de-gas-promedio-diaria-por-yacimiento.csv",
+  "output_file_name": "daily_gas_production_english.csv",
+  "data_format": "WIDE format - one row per field-month with average daily rate",
+  "priority": "MEDIUM - Useful for validation and rate analysis",
+  "use_case": "Validate monthly totals, track production rates, calculate uptime/downtime, identify production interruptions",
+
+  "column_mappings": {
+    "anio": "year",
+    "mes": "month",
+    "indice_tiempo": "time_index",
+    "empresa": "company_name",
+    "areapermisoconcesion": "permit_area_name",
+    "idareapermisoconcesion": "permit_area_id",
+    "areayacimiento": "field_name",
+    "idareayacimiento": "field_id",
+    "cuenca": "basin",
+    "provincia": "province",
+    "produccion_gas_promedio_dia_mm3": "gas_production_avg_daily_mm3"
+  },
+
+  "field_descriptions": {
+    "gas_production_avg_daily_mm3": "Average daily gas production rate in million cubic meters per day (Mm3/day) for the given month. Arithmetic mean of daily production over all producing days in the month.",
+    "time_index": "Year-month identifier in YYYY-MM format for time series analysis",
+    "field_id": "Unique field identifier - matches field_id in monthly production and field shapes",
+    "company_name": "Operating company name",
+    "basin": "Sedimentary basin (Neuquina, Golfo San Jorge, Austral, Noroeste, Cuyana)"
+  },
+
+  "unit_notes": {
+    "mm3_per_day": "Million cubic meters per day (Mm3/day) - average daily rate. Note: Mm3 = 10^6 m3",
+    "mm3": "Million cubic meters - if converting to monthly total, multiply by days in month",
+    "gas_conversion_mcf": "Mm3/day to Mcf/day (thousand cubic feet): multiply by 35.3147",
+    "gas_conversion_scf": "Mm3/day to scf/day (standard cubic feet): multiply by 35,314,700",
+    "gas_conversion_mscf": "Mm3/day to Mscf/day (thousand scf): multiply by 35,314.7",
+    "monthly_validation": "To validate: gas_production_avg_daily_mm3 * days_in_month ≈ monthly_total_mm3 from gas_field_production file"
+  },
+
+  "calculated_metrics": {
+    "monthly_expected_mm3": "gas_production_avg_daily_mm3 * days_in_month - Expected monthly production if running at full capacity",
+    "production_uptime_fraction": "actual_monthly_mm3 / (gas_production_avg_daily_mm3 * days_in_month) - Fraction of time actually producing. <1.0 indicates downtime.",
+    "downtime_days_equivalent": "(1 - uptime_fraction) * days_in_month - Equivalent days of downtime in the month",
+    "is_intermittent_production": "uptime_fraction < 0.7 - Binary flag for fields with significant downtime",
+    "gas_oil_ratio_proxy": "gas_production_avg_daily_mm3 / oil_production_avg_daily_m3 - Approximate GOR when paired with oil data (needs unit conversion)"
+  },
+
+  "data_quality_validation": {
+    "monthly_total_check": "Compare daily avg * days to monthly total from gas_field_production file. Should match within ~5% unless significant downtime.",
+    "zero_production": "Zero values may indicate: (1) field shut-in, (2) maintenance, (3) no production that month, (4) oil field with minimal associated gas, (5) data not reported",
+    "outlier_detection": "Sudden spikes or drops in daily rate month-to-month may indicate: pipeline capacity changes, new gas processing, compression issues, or data errors",
+    "consistency_check": "Gas production daily rate should be relatively stable unless gas processing/compression changes. Large variations warrant investigation.",
+    "associated_vs_non_associated": "Gas-only fields should have consistent rates. Oil fields with associated gas may have more variation tied to oil production."
+  },
+
+  "technical_notes": {
+    "average_calculation": "This is arithmetic mean of daily gas production over the month. Does not account for days with zero production vs no production.",
+    "uptime_analysis": "Comparing daily average to monthly total reveals production uptime. Gas fields often have 85-98% uptime due to continuous flow requirements.",
+    "rate_vs_volume": "Daily rate (Mm3/day) measures intensity of production. Monthly volume (Mm3) measures total production. Both needed for complete analysis.",
+    "validation_importance": "Cross-checking daily rates against monthly totals is critical quality control. Mismatches indicate data errors, downtime, or gas flaring.",
+    "decline_curve_analysis": "Daily rates more useful for decline curve analysis than monthly totals. Shows gas production rate changes over time.",
+    "comparison_to_us_units": "US oilfield uses Mcf/day (thousand cubic feet per day) or MMcf/day (million cubic feet per day) instead of Mm3/day. 1 Mm3/day = 35,314.7 Mcf/day = 35.3147 MMcf/day.",
+    "gas_compression": "Gas production rates can be limited by compression capacity. Sudden drops may indicate compressor issues rather than reservoir decline.",
+    "flaring_consideration": "Production rate here is PRODUCED gas, not SALES gas. Some produced gas may be flared, vented, or consumed on-site.",
+    "associated_gas_dynamics": "For oil fields, gas production follows oil production. For gas fields, production is primary objective and more consistent."
+  },
+
+  "data_integration": {
+    "join_key": "field_id + year + month - join to monthly production data",
+    "validation_workflow": [
+      "1. Load daily average data (this file)",
+      "2. Load monthly production totals (gas_field_production file)",
+      "3. Calculate expected monthly = daily avg * days in month",
+      "4. Compare to actual monthly total",
+      "5. Calculate uptime fraction = actual / expected",
+      "6. Flag fields with uptime < 70% for investigation"
+    ],
+    "complementary_data": "Use with monthly production totals to calculate uptime, identify production interruptions, and validate data quality",
+    "cross_validation_with_oil": "For associated gas, cross-check with oil production daily averages. GOR should be relatively consistent month-to-month."
+  },
+
+  "use_cases": {
+    "data_validation": "Primary use is validating monthly gas production totals. Daily avg * days should match monthly total within 5-10%.",
+    "uptime_calculation": "Calculate field operating uptime by comparing actual monthly to expected (daily * days). Identify reliability and compression issues.",
+    "rate_analysis": "Track gas production rate trends over time. Identify decline rates, compression capacity impacts, processing facility changes.",
+    "anomaly_detection": "Sudden changes in daily rate indicate production events: compression changes, pipeline restrictions, facility shutdowns, or data errors.",
+    "operator_performance": "Compare uptime across operators to identify best practices and operational efficiency differences.",
+    "gas_oil_ratio_tracking": "When combined with oil daily production, track field GOR evolution over time (important for reservoir management)."
+  },
+
+  "limitations": {
+    "no_well_level": "This is field-level average only. Does not show individual well contributions.",
+    "averaging_masks_detail": "Daily average smooths out intra-month variation. Doesn't show when production occurred or rate fluctuations.",
+    "zero_ambiguity": "Zero production could mean shut-in field, gas flared/vented instead of produced, or missing data. Cannot distinguish without additional info.",
+    "no_pressure_breakdown": "Unlike monthly gas_field_production file, this does not separate by pressure category (high/medium/low). Total gas only.",
+    "produced_vs_sales": "This shows produced gas. Actual sales gas may be lower due to flaring, venting, fuel use, or processing losses."
+  },
+
+  "typical_values": {
+    "small_gas_field_mm3_day": "0.01-0.1 Mm3/day typical for small gas field or oil field with associated gas (10,000-100,000 m3/day)",
+    "medium_gas_field_mm3_day": "0.1-1.0 Mm3/day for medium gas field (100,000-1,000,000 m3/day = 3.5-35 MMcf/day)",
+    "large_gas_field_mm3_day": "1.0-10.0 Mm3/day for large gas field or Vaca Muerta gas development (35-350 MMcf/day)",
+    "giant_gas_field_mm3_day": ">10.0 Mm3/day for major gas fields (>350 MMcf/day). Top Argentina fields produce 20+ Mm3/day.",
+    "expected_uptime": "Gas fields: 90-98% (continuous production preferred). Oil fields with associated gas: 80-95% (tied to oil production).",
+    "unconventional_vaca_muerta": "Vaca Muerta gas wells can produce 0.01-0.5 Mm3/day initially, declining to 0.001-0.05 Mm3/day after 2-3 years."
+  },
+
+  "example_analysis": {
+    "uptime_calculation_python": "uptime = monthly_total_mm3 / (daily_avg_mm3 * days_in_month)",
+    "downtime_days_python": "downtime_days = (1 - uptime) * days_in_month",
+    "validation_check_python": "is_valid = abs(monthly_total_mm3 - daily_avg_mm3 * days_in_month) / monthly_total_mm3 < 0.10  # Within 10%",
+    "rate_decline_python": "monthly_decline_fraction = (prev_month_rate - curr_month_rate) / prev_month_rate",
+    "gor_estimation_python": "# GOR in scf/bbl (requires unit conversion)\ngor_scf_bbl = (gas_mm3_day * 35314700) / (oil_m3_day * 6.28981)",
+    "convert_to_mcf_day": "gas_mcf_day = gas_mm3_day * 35314.7",
+    "convert_to_mmcf_day": "gas_mmcf_day = gas_mm3_day * 35.3147"
+  },
+
+  "opgee_relevance": {
+    "gas_production_opgee": "For OPGEE, this daily rate data helps validate annual production inputs and assess field stability.",
+    "gor_calculation": "Combined with oil daily production, can calculate field GOR - critical OPGEE input parameter.",
+    "flaring_estimation": "Difference between produced gas (this file) and sales gas (from plant processing file) indicates flaring/venting levels.",
+    "production_consistency": "Uptime analysis reveals field operational stability - affects OPGEE energy consumption and emissions estimates."
+  }
+}
