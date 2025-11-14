@@ -10,6 +10,7 @@ from fastapi import (
     status,
     UploadFile,
     File,
+    Form,
     BackgroundTasks,
 )
 from pydantic import BaseModel, Field, ConfigDict
@@ -61,7 +62,10 @@ class DataEntryUploadResponse(BaseModel):
 async def upload_data_entry(
     current_user: CurrentUser,
     db: DBSessionDep,
-    form_data: DataEntryUploadForm = Depends(),
+    source_id: int = Form(...),
+    granularity: DataGranularity = Form(...),
+    alias: Optional[str] = Form(None),
+    additional_metadata: Optional[str] = Form(None),
     data_file: UploadFile = File(...),
     config_file: UploadFile = File(...),
 ):
@@ -76,10 +80,10 @@ async def upload_data_entry(
     - data_file: The data file (CSV, etc.)
     - config_file: JSON configuration file for mapping data
     """
-    additional_metadata: Optional[Dict[str, Any]] = None
-    if form_data.additional_metadata:
+    additional_metadata_dict: Optional[Dict[str, Any]] = None
+    if additional_metadata:
         try:
-            additional_metadata = json.loads(form_data.additional_metadata)
+            additional_metadata_dict = json.loads(additional_metadata)
         except json.JSONDecodeError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -89,7 +93,7 @@ async def upload_data_entry(
     # Check if source exists and user has access
     data_source = (
         db.query(DataSourceMeta)
-        .filter(DataSourceMeta.id == form_data.source_id)
+        .filter(DataSourceMeta.id == source_id)
         .first()
     )
     if not data_source:
@@ -130,17 +134,17 @@ async def upload_data_entry(
     try:
         data_entry = await validate_data_entry(
             db=db,
-            source_id=form_data.source_id,
+            source_id=source_id,
             record_id=record_id,
             version=version,
-            alias=form_data.alias
+            alias=alias
             or data_file.filename
             or "",  # Use filename as alias if not provided
-            granularity=form_data.granularity,
+            granularity=granularity,
             file_extension=file_extension,
             data_file=data_file,
             config_file=config_file,
-            additional_metadata=additional_metadata,
+            additional_metadata=additional_metadata_dict,
         )
 
         return DataEntryUploadResponse(

@@ -38,6 +38,6 @@ def validate_config(config: Dict[str, Any]) -> DataEntryConfiguration:
             loc = " -> ".join(str(x) for x in error["loc"])
             msg = error["msg"]
             errors.append(f"{loc}: {msg}")
-        raise ValidationError(f"Invalid config file: {errors}") from e
+        raise ValueError(f"Invalid config file: {errors}") from e
     except Exception as e:
         raise ValueError(f"Unexpected error validating config: {str(e)}") from e

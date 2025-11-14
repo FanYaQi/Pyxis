@@ -9,6 +9,7 @@ Pipfile.lock
 # Raw data files (user-provided, often large)
 argentina/raw/
 argentina/output/
+global_sources/output
 
 # Python
 __pycache__/
