@@ -130,7 +130,20 @@ PYXIS_TO_OPGEE_MAPPING = {
     'reservoir_pressure': 'res_press',
     'reservoir_temperature': 'res_temp',
     'productivity_index': 'prod_index',
-    'well_diameter': 'well_diam'
+    'well_diameter': 'well_diam',
+    # Gas composition fields (case conversion needed)
+    'gas_comp_n2': 'gas_comp_N2',
+    'gas_comp_co2': 'gas_comp_CO2',
+    'gas_comp_c1': 'gas_comp_C1',
+    'gas_comp_c2': 'gas_comp_C2',
+    'gas_comp_c3': 'gas_comp_C3',
+    'gas_comp_c4': 'gas_comp_C4',
+    'gas_comp_h2s': 'gas_comp_H2S',
+    # Injection ratio fields (case conversion needed)
+    'glir': 'GLIR',
+    'gfir': 'GFIR',
+    # Special processing fields (case conversion needed)
+    'frac_co2_breakthrough': 'frac_CO2_breakthrough'
 }
 
 
