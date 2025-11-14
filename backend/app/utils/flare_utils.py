@@ -401,21 +401,36 @@ class FlareUtils:
     def validate_geometry(geometry: WKBElement) -> bool:
         """
         Validate that a geometry is valid and usable.
-        
+
         Args:
             geometry: PostGIS geometry to validate
-            
+
         Returns:
             True if geometry is valid, False otherwise
         """
         try:
             if not geometry:
                 return False
-                
+
             # Convert to Shapely and check validity
             shapely_geom = to_shape(geometry)
-            return shapely_geom.is_valid and not shapely_geom.is_empty
-            
+            if not shapely_geom.is_valid or shapely_geom.is_empty:
+                return False
+
+            # Check if coordinates are in valid WGS84 range
+            # If not, it's likely projected coordinates with wrong SRID
+            bounds = shapely_geom.bounds  # (minx, miny, maxx, maxy)
+            min_lon, min_lat, max_lon, max_lat = bounds
+
+            # Valid WGS84 ranges: lon [-180, 180], lat [-90, 90]
+            if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180 and
+                    -90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+                logger.warning(f"Geometry has invalid WGS84 coordinates: bounds={bounds}. "
+                             f"Likely projected coordinates stored with wrong SRID.")
+                return False
+
+            return True
+
         except Exception as e:
             logger.error(f"Error validating geometry: {str(e)}")
             return False
