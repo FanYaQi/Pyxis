@@ -43,8 +43,12 @@ async def generate_opgee_input(
         HTTPException: If validation fails or processing errors occur
     """
     try:
+        # Debug logging
+        logger.info(f"OPGEE Request received: field_ids={request.field_ids}, country={request.country}, production_type={request.production_type}")
+
         # Validate request parameters
         if not request.field_ids and not request.country:
+            logger.error(f"Validation failed: field_ids={request.field_ids}, country={request.country}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Must provide either field_ids or country parameter"

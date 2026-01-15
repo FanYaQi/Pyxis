@@ -109,6 +109,9 @@ class PyxisFieldMeta(Base):
     # Basic field information
     name: Mapped[Optional[str]] = mapped_column(index=True)
     country: Mapped[Optional[str]] = mapped_column(index=True)
+    functional_unit: Mapped[Optional[FunctionalUnit]] = mapped_column(
+        comment="Whether the field produces primarily oil or gas"
+    )
     centroid_h3_index: Mapped[Optional[str]] = mapped_column(
         index=True, comment="H3 index of the field centroid"
     )
@@ -166,6 +169,12 @@ class PyxisFieldData(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
+    )
+
+    # Source field identifier for matching across time-series data from same source
+    field_id: Mapped[Optional[str]] = mapped_column(
+        index=True,
+        comment="Original field identifier from the data source (e.g., government field code)"
     )
 
     name: Mapped[Optional[str]] = mapped_column(index=True)

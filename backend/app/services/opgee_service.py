@@ -326,10 +326,11 @@ class OpgeeService:
                 start_date=start_date,
                 end_date=end_date,
                 db=db,
-                field_ids=[f.id for f in fields],  # Use filtered field IDs
+                field_ids=[f.id for f in fields] if fields else None,  # Pass None if empty
+                country=country,  # Pass country as fallback
                 proximity_distance_km=flare_config.proximity_distance_km,
                 buffer_distance_km=flare_config.buffer_distance_km,
-                allocation_strategy=flare_config.allocation_strategy.value  # Add this line
+                allocation_strategy=flare_config.allocation_strategy.value
             )
             
             total_flares_assigned = flare_stats.get('total_flares_assigned', 0)
@@ -612,10 +613,13 @@ class OpgeeService:
         if production_type:
             # Use subquery approach to avoid join issues
             logger.info(f"Applying production type filter: {production_type}")
-            
+
+            # Convert to uppercase to match database enum values (OIL, GAS)
+            production_type_upper = production_type.upper()
+
             # Get field IDs that have records with the desired functional_unit
             field_ids_with_type = db.query(PyxisFieldData.pyxis_field_meta_id).filter(
-                PyxisFieldData.functional_unit == production_type
+                PyxisFieldData.functional_unit == production_type_upper
             ).distinct().all()
             
             field_ids_list = [row[0] for row in field_ids_with_type]

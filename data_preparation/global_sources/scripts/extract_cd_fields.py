@@ -19,7 +19,7 @@ warnings.filterwarnings('ignore')
 
 # Constants
 M_TO_FT = 3.28084
-GOR_THRESHOLD = 100000  # scf/bbl threshold for oil vs gas
+GOR_THRESHOLD = 2000  # scf/bbl threshold for oil vs gas (typical industry standard)
 
 # Data paths
 SCRIPTS_DIR = Path(__file__).parent

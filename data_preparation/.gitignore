@@ -1,3 +1,7 @@
+# Environment variables (contains sensitive API keys)
+.env
+**/.env
+
 # Virtual Environment
 .venv/
 env/
@@ -10,7 +14,7 @@ Pipfile.lock
 argentina/raw/
 argentina/output/
 global_sources/output
-
+global_sources/methane_raw
 # Python
 __pycache__/
 *.py[cod]

@@ -301,6 +301,7 @@ def generate_config_json() -> Dict:
             ]
         },
         "mappings": [
+            {"source_attribute": "field_id", "target_attribute": "field_id"},
             {"source_attribute": "field_name", "target_attribute": "name"},
             {"source_attribute": "country", "target_attribute": "country"},
             {"source_attribute": "valid_from", "target_attribute": "valid_from"},
@@ -401,13 +402,16 @@ class PyxisAPIClient:
                     print(f"   Response text: {e.response.text}")
             raise
 
-    def trigger_processing(self, data_entry_id: int, prevent_self_matching: bool = True):
+    def trigger_processing(self, data_entry_id: int, prevent_self_matching: bool = True, match_by_source_id: bool = False):
         """Trigger processing for a data entry."""
         if not self.token:
             raise ValueError("Not logged in")
 
         url = f"{self.base_url}/data-entries/{data_entry_id}/process"
-        params = {'prevent_self_matching': prevent_self_matching}
+        params = {
+            'prevent_self_matching': prevent_self_matching,
+            'match_by_source_id': match_by_source_id
+        }
         headers = {"Authorization": f"Bearer {self.token}"}
 
         try:
@@ -464,6 +468,7 @@ def main():
     parser.add_argument('--end-year', type=int, default=DEFAULT_END_YEAR, help=f'End year (default: current year)')
     parser.add_argument('--months', type=str, help='Month range (e.g., "1-12" or "1,3,5")')
     parser.add_argument('--prevent-self-matching', action='store_true', default=True, help='Prevent self-matching (default: True)')
+    parser.add_argument('--match-by-source-id', action='store_true', default=True, help='Match by source field ID instead of fuzzy matching (default: True)')
     args = parser.parse_args()
 
     # Get credentials
@@ -502,10 +507,12 @@ def main():
     print("ARGENTINA MONTHLY DYNAMIC DATA → PYXIS API UPLOAD")
     print("="*70)
     print(f"API URL: {API_BASE_URL}")
+    print(f"Source ID: {args.source_id}")
     print(f"Years: {years[0]}-{years[-1]} ({len(years)} years)")
     print(f"Months: {months}")
     print(f"Total uploads: {len(years) * len(months)}")
     print(f"Prevent self-matching: {args.prevent_self_matching}")
+    print(f"Match by source ID: {args.match_by_source_id}")
     print("="*70 + "\n")
 
     # Initialize API client
@@ -551,7 +558,11 @@ def main():
                 print(f"  ✓ Uploaded (Entry ID: {data_entry_id})")
 
                 # Trigger processing
-                client.trigger_processing(data_entry_id, prevent_self_matching=args.prevent_self_matching)
+                client.trigger_processing(
+                    data_entry_id,
+                    prevent_self_matching=args.prevent_self_matching,
+                    match_by_source_id=args.match_by_source_id
+                )
                 print(f"  ✓ Processing triggered")
 
                 # Wait for completion

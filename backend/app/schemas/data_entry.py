@@ -1,5 +1,6 @@
 from typing import Optional, Any, Dict, List
 from datetime import datetime, date
+from enum import Enum
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.postgres.models.data_entry import (
@@ -7,6 +8,68 @@ from app.postgres.models.data_entry import (
     DataGranularity,
     ProcessingStatus,
 )
+
+
+class MatchSequence(str, Enum):
+    """Sequence strategy for processing entries in batch"""
+    SOURCE_SCORE = "source_score"  # Process by data source pyxis_score (highest first)
+    TIME_RECENCY = "time_recency"  # Process by valid_from date (newest first)
+    ENTRY_ORDER = "entry_order"    # Process in the order specified in request
+
+
+class BatchEntryConfig(BaseModel):
+    """Configuration for a single entry in batch processing"""
+    entry_id: int = Field(..., description="Data entry ID to process")
+    prevent_self_matching: bool = Field(
+        default=False,
+        description="Prevent matching to fields created in the same batch"
+    )
+    match_by_source_id: bool = Field(
+        default=False,
+        description="Match by source field identifier instead of fuzzy name/geo matching. "
+                    "Use for same-source data (e.g., gov monthly matching to gov static fields)"
+    )
+
+
+class BatchProcessRequest(BaseModel):
+    """Request schema for batch processing data entries"""
+    entries: List[BatchEntryConfig] = Field(
+        ...,
+        description="List of entries to process with their configurations",
+        min_length=1
+    )
+    match_sequence: MatchSequence = Field(
+        default=MatchSequence.SOURCE_SCORE,
+        description="Strategy for ordering entry processing. "
+                    "source_score: highest quality sources first (creates base fields). "
+                    "time_recency: newest data first. "
+                    "entry_order: process in the order specified."
+    )
+
+
+class BatchEntryResult(BaseModel):
+    """Result for a single entry in batch processing"""
+    entry_id: int
+    alias: str
+    status: ProcessingStatus
+    records_created: int = 0
+    fields_matched: int = 0
+    fields_created: int = 0
+    error_message: Optional[str] = None
+    processing_time_seconds: Optional[float] = None
+
+
+class BatchProcessResponse(BaseModel):
+    """Response schema for batch processing"""
+    success: bool
+    total_entries: int
+    completed: int
+    failed: int
+    results: List[BatchEntryResult]
+    processing_order: List[int] = Field(
+        description="Order in which entries were processed (by entry_id)"
+    )
+    total_processing_time_seconds: float
 
 
 class DataEntryInfo(BaseModel):

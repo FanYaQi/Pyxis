@@ -3,6 +3,7 @@ import json
 import logging
 import hashlib
 import uuid
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from geoalchemy2.shape import to_shape
 
 from app.postgres.models.pyxis_field import PyxisFieldMeta, PyxisFieldData
+from app.postgres.models.data_source import DataSourceMeta
 from app.postgres.models.data_entry import (
     DataEntry,
     ProcessingStatus,
@@ -26,6 +28,12 @@ from app.validators.config_validator import validate_config
 from app.validators.data_validator import validate_data
 from app.validators.opgee_validator import validate_opgee_mappings
 from app.schemas.data_entry_config import DataEntryConfiguration
+from app.schemas.data_entry import (
+    BatchProcessRequest,
+    BatchProcessResponse,
+    BatchEntryResult,
+    MatchSequence,
+)
 from app.utils.data_type_utils import convert_value
 from app.utils.merge_utils import merge_specific_attributes
 
@@ -165,7 +173,8 @@ async def trigger_data_processing(
     data_entry: DataEntry,
     background_tasks: BackgroundTasks,
     db: Session,
-    prevent_self_matching: bool = False,  # Add this parameter
+    prevent_self_matching: bool = False,
+    match_by_source_id: bool = False,
 ) -> Dict[str, Any]:
     """
     Trigger data processing for a data entry.
@@ -175,6 +184,7 @@ async def trigger_data_processing(
         background_tasks: FastAPI background tasks
         db: Database session
         prevent_self_matching: Prevent matching to fields from the same processing session
+        match_by_source_id: Match by source field identifier instead of fuzzy name/geo matching
 
     Returns:
         Dict with result:
@@ -202,17 +212,18 @@ async def trigger_data_processing(
     db.add(data_entry)
     db.commit()
 
-    # Add background task with the prevent_self_matching parameter
+    # Add background task with matching parameters
     background_tasks.add_task(
         process_data_entry_background,
         data_entry,
         db,
-        prevent_self_matching,  # Pass the parameter
+        prevent_self_matching,
+        match_by_source_id,
     )
 
     return {
         "success": True,
-        "message": f"Processing started for data entry with ID {data_entry.id} (prevent_self_matching: {prevent_self_matching})",
+        "message": f"Processing started for data entry with ID {data_entry.id} (prevent_self_matching: {prevent_self_matching}, match_by_source_id: {match_by_source_id})",
         "data_entry_id": data_entry.id,
         "status": ProcessingStatus.PROCESSING,
     }
@@ -322,10 +333,11 @@ def find_matching_field(
 
 @logfire.instrument("Background data processing task for data entry {data_entry=}")
 def process_data_entry_background(
-    data_entry: DataEntry, 
-    db: Session, 
-    prevent_self_matching: bool = False  # Add this parameter
-) -> None:
+    data_entry: DataEntry,
+    db: Session,
+    prevent_self_matching: bool = False,
+    match_by_source_id: bool = False,
+) -> Dict[str, int]:
     """
     Process a data entry in the background.
 
@@ -333,19 +345,25 @@ def process_data_entry_background(
         data_entry: The data entry to process
         db: Database session
         prevent_self_matching: Prevent matching to fields from the same processing session
+        match_by_source_id: Match by source field identifier instead of fuzzy name/geo matching
+
+    Returns:
+        Dict with processing stats: {"records_created", "fields_matched", "fields_created"}
     """
     db.add(data_entry)
+    stats = {"records_created": 0, "fields_matched": 0, "fields_created": 0}
     try:
         logger.info(
-            "Starting background processing for data entry %s (prevent_self_matching: %s)", 
-            data_entry.id, 
-            prevent_self_matching
+            "Starting background processing for data entry %s (prevent_self_matching: %s, match_by_source_id: %s)",
+            data_entry.id,
+            prevent_self_matching,
+            match_by_source_id
         )
 
         # Process data based on file type
         with logfire.span(f"Process data for type {data_entry.file_extension}"):
             if data_entry.file_extension == FileExtension.CSV:
-                process_csv_data(data_entry, db, prevent_self_matching)  # Pass parameter
+                stats = process_csv_data(data_entry, db, prevent_self_matching, match_by_source_id)
             else:
                 # Set error for unsupported file types
                 data_entry.status = ProcessingStatus.FAILED
@@ -355,7 +373,7 @@ def process_data_entry_background(
                 logger.error(
                     "Unsupported file extension: %s", data_entry.file_extension
                 )
-                return
+                return stats
 
         # Update status to COMPLETED
         data_entry.status = ProcessingStatus.COMPLETED
@@ -369,14 +387,15 @@ def process_data_entry_background(
     finally:
         db.commit()
 
+    return stats
 
-# Replace the process_csv_data function in data_entry_service.py
 
 def process_csv_data(
-    data_entry: DataEntry, 
-    db: Session, 
-    prevent_self_matching: bool = False
-) -> None:
+    data_entry: DataEntry,
+    db: Session,
+    prevent_self_matching: bool = False,
+    match_by_source_id: bool = False,
+) -> Dict[str, int]:
     """
     Process CSV data and create Pyxis field data entries.
 
@@ -384,6 +403,10 @@ def process_csv_data(
         data_entry: Data entry object
         db: Database session
         prevent_self_matching: Prevent matching to fields from the same processing session
+        match_by_source_id: Match by source field identifier instead of fuzzy name/geo matching
+
+    Returns:
+        Dict with stats: {"records_created", "fields_matched", "fields_created"}
     """
     try:
         # Parse the config JSON to a Pydantic model
@@ -396,6 +419,7 @@ def process_csv_data(
         raise ValueError("No mappings found in config file")
 
     logger.info(f"Self-matching prevention: {'ENABLED' if prevent_self_matching else 'DISABLED'}")
+    logger.info(f"Match by source ID: {'ENABLED' if match_by_source_id else 'DISABLED'}")
 
     # Parse CSV data using configuration
     csv_config = (
@@ -419,9 +443,14 @@ def process_csv_data(
 
     # Track field metas that need to be merged
     field_metas_to_merge = set()
-    
+
     # Track ONLY newly created field meta IDs (not matched ones)
     newly_created_field_meta_ids = set()
+
+    # Stats tracking
+    records_created = 0
+    fields_matched = 0
+    fields_created = 0
 
     # Process each row in the CSV
     for row_index, row in df.iterrows():
@@ -432,18 +461,21 @@ def process_csv_data(
         exclude_ids = newly_created_field_meta_ids if prevent_self_matching else None
 
         # Find or create a PyxisFieldMeta record
-        field_meta, is_new = get_or_create_field_meta(field_attrs, db, exclude_ids)
+        field_meta, is_new = get_or_create_field_meta(
+            field_attrs, db, exclude_ids, match_by_source_id, data_entry.source_id
+        )
 
         # Only track newly created fields for exclusion (not matched existing fields)
         if is_new:
             newly_created_field_meta_ids.add(field_meta.id)
-        #     logger.info(f"Row {row_index}: Created NEW field '{field_meta.name}' (ID: {field_meta.id})")
-        # else:
-        #     logger.info(f"Row {row_index}: Matched to EXISTING field '{field_meta.name}' (ID: {field_meta.id})")
+            fields_created += 1
+        else:
+            fields_matched += 1
 
         # Create a PyxisFieldData record
         field_data = create_field_data(field_meta, field_attrs, data_entry)
         db.add(field_data)
+        records_created += 1
 
         # Track this field meta for merging
         field_metas_to_merge.add(field_meta.id)
@@ -457,13 +489,19 @@ def process_csv_data(
 
     # Commit all changes
     db.commit()
-    
+
     logger.info(f"Processed {len(df)} rows with {len(field_metas_to_merge)} total fields")
-    logger.info(f"Created {len(newly_created_field_meta_ids)} new fields")
-    logger.info(f"Matched to {len(field_metas_to_merge) - len(newly_created_field_meta_ids)} existing fields")
-    
+    logger.info(f"Created {fields_created} new fields")
+    logger.info(f"Matched to {fields_matched} existing fields")
+
     if prevent_self_matching:
         logger.info(f"Self-matching prevention excluded {len(newly_created_field_meta_ids)} newly created field IDs from matching")
+
+    return {
+        "records_created": records_created,
+        "fields_matched": fields_matched,
+        "fields_created": fields_created
+    }
 
 
 def extract_field_attributes(
@@ -523,17 +561,21 @@ def extract_field_attributes(
 
 
 def get_or_create_field_meta(
-    field_attrs: Dict[str, Any], 
+    field_attrs: Dict[str, Any],
     db: Session,
     exclude_field_meta_ids: Optional[set] = None,
+    match_by_source_id: bool = False,
+    source_id: Optional[int] = None,
 ) -> Tuple[PyxisFieldMeta, bool]:
     """
     Find or create a PyxisFieldMeta record based on field attributes.
-    
+
     Args:
         field_attrs: Dictionary of field attributes
         db: Database session
         exclude_field_meta_ids: Set of field meta IDs to exclude from matching
+        match_by_source_id: If True, match by source field identifier instead of fuzzy matching
+        source_id: Source ID for source-based matching (required if match_by_source_id=True)
 
     Returns:
         Tuple of (PyxisFieldMeta object, is_new flag)
@@ -542,17 +584,34 @@ def get_or_create_field_meta(
     field_name = field_attrs.get("name")
     field_country = field_attrs.get("country")
     centroid_h3_index = field_attrs.get("centroid_h3_index")
+    source_field_id = field_attrs.get("field_id")  # Source's original field identifier
 
-    # Try to find a matching field (excluding current session fields if specified)
-    matching_field, match_score = find_matching_field(
-        field_name, field_country, centroid_h3_index, db, exclude_field_meta_ids
-    )
+    # If match_by_source_id is enabled, try to find by source field ID first
+    if match_by_source_id and source_field_id:
+        matching_field = find_field_by_source_id(source_field_id, source_id, field_country, db)
+        if matching_field:
+            logger.debug(
+                f"Found field by source ID '{source_field_id}' -> '{matching_field.name}' (ID: {matching_field.id})"
+            )
+            return matching_field, False
+        else:
+            # If no match found by source ID, fall through to create new or fuzzy match
+            logger.warning(
+                f"No field found for source_field_id='{source_field_id}', source_id={source_id}. "
+                f"Will create new field."
+            )
 
-    if matching_field:
-        logger.info(
-            f"Found matching field '{matching_field.name}' with score {match_score}"
+    # Standard fuzzy matching by name and location
+    if not match_by_source_id:
+        matching_field, match_score = find_matching_field(
+            field_name, field_country, centroid_h3_index, db, exclude_field_meta_ids
         )
-        return matching_field, False
+
+        if matching_field:
+            logger.info(
+                f"Found matching field '{matching_field.name}' with score {match_score}"
+            )
+            return matching_field, False
 
     # Create new field meta if no match found
     logger.info(f"Creating new field '{field_name}' (no match found)")
@@ -565,12 +624,58 @@ def get_or_create_field_meta(
     )
     db.add(new_field)
     db.flush()  # Get ID assigned by database
-    
+
     return new_field, True
+
+
+def find_field_by_source_id(
+    source_field_id: str,
+    source_id: Optional[int],
+    country: Optional[str],
+    db: Session
+) -> Optional[PyxisFieldMeta]:
+    """
+    Find a PyxisFieldMeta by looking up existing PyxisFieldData records
+    that came from the same source and have the same source field identifier.
+
+    This enables matching monthly data to static data from the same government source
+    without requiring expensive fuzzy name/geo matching.
+
+    Args:
+        source_field_id: The field identifier from the source (e.g., government field code)
+        source_id: The data source ID to search within
+        country: Country filter to narrow down matches
+        db: Database session
+
+    Returns:
+        PyxisFieldMeta if found, None otherwise
+    """
+    # Build query to find existing field data with matching source field ID
+    query = (
+        db.query(PyxisFieldData)
+        .join(DataEntry, PyxisFieldData.data_entry_id == DataEntry.id)
+        .filter(PyxisFieldData.field_id == source_field_id)
+    )
+
+    # Filter by source if provided
+    if source_id:
+        query = query.filter(DataEntry.source_id == source_id)
+
+    # Filter by country if provided
+    if country:
+        query = query.filter(PyxisFieldData.country == country)
+
+    # Get the first matching field data
+    existing_field_data = query.first()
+
+    if existing_field_data and existing_field_data.pyxis_field_meta_id:
+        return db.get(PyxisFieldMeta, existing_field_data.pyxis_field_meta_id)
+
+    return None
 
 def update_pyxis_field_meta_merge(field_meta_id: int, db: Session) -> None:
     """
-    Update PyxisFieldMeta with merged name, country, and geometry from all associated field data.
+    Update PyxisFieldMeta with merged name, country, functional_unit, and geometry from all associated field data.
     Calculate centroid H3 from merged geometry.
 
     Args:
@@ -593,10 +698,10 @@ def update_pyxis_field_meta_merge(field_meta_id: int, db: Session) -> None:
     if not field_data_records:
         return
 
-    # Merge only name, country, and geometry using merge utilities
+    # Merge only name, country, functional_unit, and geometry using merge utilities
     merged_values = merge_specific_attributes(
-        field_data_records, 
-        ['name', 'country', 'geometry']
+        field_data_records,
+        ['name', 'country', 'functional_unit', 'geometry']
     )
 
     # Update field meta with merged values
@@ -653,4 +758,164 @@ def get_processed_fields_count(data_entry_id: int, db: Session) -> int:
         db.query(PyxisFieldData)
         .filter(PyxisFieldData.data_entry_id == data_entry_id)
         .count()
+    )
+
+
+def batch_process_entries(
+    request: BatchProcessRequest,
+    db: Session
+) -> BatchProcessResponse:
+    """
+    Process multiple data entries in a controlled sequence.
+
+    The entries are processed synchronously in sequence based on the specified
+    match_sequence strategy. This allows higher quality sources to create base
+    fields that lower quality sources can match against.
+
+    Args:
+        request: BatchProcessRequest with entries and match_sequence
+        db: Database session
+
+    Returns:
+        BatchProcessResponse with results for each entry
+    """
+    start_time = time.time()
+    results: List[BatchEntryResult] = []
+    processing_order: List[int] = []
+
+    # Build entry config map
+    entry_configs = {e.entry_id: e for e in request.entries}
+    entry_ids = list(entry_configs.keys())
+
+    # Fetch all entries
+    entries = db.query(DataEntry).filter(DataEntry.id.in_(entry_ids)).all()
+    entry_map = {e.id: e for e in entries}
+
+    # Determine processing order based on match_sequence
+    if request.match_sequence == MatchSequence.SOURCE_SCORE:
+        # Sort by data source pyxis_score (highest first)
+        # Fetch source scores
+        source_ids = {e.source_id for e in entries}
+        sources = db.query(DataSourceMeta).filter(DataSourceMeta.id.in_(source_ids)).all()
+        source_scores = {s.id: s.pyxis_score or 0.0 for s in sources}
+
+        # Sort entries by source score (descending)
+        sorted_entries = sorted(
+            entries,
+            key=lambda e: source_scores.get(e.source_id, 0.0),
+            reverse=True
+        )
+        processing_order = [e.id for e in sorted_entries]
+
+    elif request.match_sequence == MatchSequence.TIME_RECENCY:
+        # Sort by valid_from date (newest first, None values last)
+        sorted_entries = sorted(
+            entries,
+            key=lambda e: (e.valid_from is None, e.valid_from),
+            reverse=True
+        )
+        processing_order = [e.id for e in sorted_entries]
+
+    else:  # ENTRY_ORDER
+        # Keep the order specified in the request
+        processing_order = entry_ids
+
+    logger.info(f"Batch processing {len(processing_order)} entries in order: {processing_order}")
+    logger.info(f"Match sequence strategy: {request.match_sequence.value}")
+
+    completed = 0
+    failed = 0
+
+    # Process each entry in order
+    for entry_id in processing_order:
+        entry = entry_map.get(entry_id)
+        config = entry_configs.get(entry_id)
+
+        if not entry or not config:
+            results.append(BatchEntryResult(
+                entry_id=entry_id,
+                alias="Unknown",
+                status=ProcessingStatus.FAILED,
+                error_message=f"Entry {entry_id} not found"
+            ))
+            failed += 1
+            continue
+
+        entry_start_time = time.time()
+
+        # Check if entry is in processable state
+        if entry.status not in [ProcessingStatus.PENDING, ProcessingStatus.FAILED]:
+            results.append(BatchEntryResult(
+                entry_id=entry_id,
+                alias=entry.alias,
+                status=entry.status,
+                error_message=f"Entry not in PENDING/FAILED state (current: {entry.status})"
+            ))
+            failed += 1
+            continue
+
+        # Set to PROCESSING
+        entry.status = ProcessingStatus.PROCESSING
+        db.add(entry)
+        db.commit()
+
+        try:
+            # Process synchronously with the configured options
+            stats = process_csv_data(
+                entry, db,
+                prevent_self_matching=config.prevent_self_matching,
+                match_by_source_id=config.match_by_source_id
+            )
+
+            # Mark as completed
+            entry.status = ProcessingStatus.COMPLETED
+            entry.error_message = None
+            db.commit()
+
+            entry_time = time.time() - entry_start_time
+            results.append(BatchEntryResult(
+                entry_id=entry_id,
+                alias=entry.alias,
+                status=ProcessingStatus.COMPLETED,
+                records_created=stats.get("records_created", 0),
+                fields_matched=stats.get("fields_matched", 0),
+                fields_created=stats.get("fields_created", 0),
+                processing_time_seconds=round(entry_time, 2)
+            ))
+            completed += 1
+
+            logger.info(
+                f"Entry {entry_id} ({entry.alias}) completed: "
+                f"{stats.get('records_created', 0)} records, "
+                f"{stats.get('fields_created', 0)} new fields, "
+                f"{stats.get('fields_matched', 0)} matched"
+            )
+
+        except Exception as e:
+            entry.status = ProcessingStatus.FAILED
+            entry.error_message = str(e)[:500]
+            db.commit()
+
+            entry_time = time.time() - entry_start_time
+            results.append(BatchEntryResult(
+                entry_id=entry_id,
+                alias=entry.alias,
+                status=ProcessingStatus.FAILED,
+                error_message=str(e)[:500],
+                processing_time_seconds=round(entry_time, 2)
+            ))
+            failed += 1
+
+            logger.error(f"Entry {entry_id} ({entry.alias}) failed: {str(e)}")
+
+    total_time = time.time() - start_time
+
+    return BatchProcessResponse(
+        success=failed == 0,
+        total_entries=len(processing_order),
+        completed=completed,
+        failed=failed,
+        results=results,
+        processing_order=processing_order,
+        total_processing_time_seconds=round(total_time, 2)
     )

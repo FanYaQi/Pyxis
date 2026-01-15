@@ -93,29 +93,59 @@ def read_dbf_records(dbf_path: Path, country_filter: str = None) -> List[Dict]:
     return records
 
 
-def read_shp_geometries(shp_path: Path) -> List[Dict]:
+def read_shp_geometries_as_gdf(shp_path: Path, country_filter: str = None):
     """
-    Read shapefile geometries using simple binary parsing.
+    Read shapefile, filter by country, and transform geometries to WGS84 (EPSG:4326).
+
+    Args:
+        shp_path: Path to shapefile
+        country_filter: Optional country name to filter (e.g., "Argentina")
 
     Returns:
-        List of geometry dictionaries with index
+        GeoDataFrame with all attributes plus geometry_json column in WGS84 coordinates
     """
-    # We'll use ogr or geopandas if available, otherwise skip geometry
     try:
         import geopandas as gpd
         from shapely.geometry import mapping
+
+        # Read entire shapefile
         gdf = gpd.read_file(shp_path)
-        geometries = []
-        for idx, row in gdf.iterrows():
-            if row.geometry is not None:
-                geometries.append({
-                    'index': idx,
-                    'geometry': json.dumps(mapping(row.geometry))
-                })
-        return geometries
+        print(f"   Source CRS: {gdf.crs}")
+        print(f"   Total features in shapefile: {len(gdf):,}")
+
+        # Filter by country if specified
+        if country_filter:
+            country_col = 'MD_Country'  # GOGI uses MD_Country field
+            if country_col not in gdf.columns:
+                print(f"   WARNING: Column '{country_col}' not found in shapefile")
+                return None
+
+            # Filter (case-insensitive contains)
+            gdf = gdf[gdf[country_col].str.contains(country_filter, case=False, na=False)]
+            print(f"   Features after filtering by {country_filter}: {len(gdf):,}")
+
+            if len(gdf) == 0:
+                print(f"   WARNING: No features found for {country_filter}")
+                return None
+
+        # Transform to WGS84 if not already in EPSG:4326
+        if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+            print(f"   Transforming geometries from {gdf.crs.to_string()} to EPSG:4326 (WGS84)")
+            gdf = gdf.to_crs(epsg=4326)
+            print(f"   Transformation complete")
+        elif gdf.crs is None:
+            print(f"   WARNING: No CRS defined, assuming geometries are already in WGS84")
+        else:
+            print(f"   Geometries already in WGS84")
+
+        # Add geometry_json column with GeoJSON representations
+        gdf['geometry_json'] = gdf['geometry'].apply(lambda geom: json.dumps(mapping(geom)) if geom is not None else None)
+
+        return gdf
+
     except ImportError:
         print("   WARNING: geopandas/shapely not available, skipping geometry extraction")
-        return []
+        return None
 
 
 def parse_functional_unit(commodity: str) -> Optional[str]:
@@ -182,32 +212,43 @@ def extract_gogi_fields(country: str) -> pd.DataFrame:
     print(f"=== Extracting GOGI Fields for {country} ===")
     print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Read DBF records
-    print(f"\n1. Reading DBF data from {DBF_PATH.name}...")
-    records = read_dbf_records(DBF_PATH, country_filter=country)
-    print(f"   {country} records: {len(records):,}")
+    # Read shapefile with geometries FIRST (to get ALL records with geometries)
+    print(f"\n1. Reading shapefile with geometries from {SHAPEFILE_PATH.name}...")
+    geometries_gdf = read_shp_geometries_as_gdf(SHAPEFILE_PATH, country_filter=country)
 
-    if len(records) == 0:
-        print(f"   WARNING: No records found for {country}")
+    if geometries_gdf is None or len(geometries_gdf) == 0:
+        print(f"   WARNING: No geometries found for {country}")
         return pd.DataFrame()
 
-    # Read shapefile geometries
-    print(f"\n2. Reading shapefile geometries from {SHAPEFILE_PATH.name}...")
-    geometries = read_shp_geometries(SHAPEFILE_PATH)
-    print(f"   Total geometries: {len(geometries):,}")
+    print(f"   {country} geometries: {len(geometries_gdf):,}")
 
-    # Convert to DataFrame
-    df = pd.DataFrame(records)
+    # Filter out basin records (Type 1, 3, 4)
+    print(f"\n2. Filtering out basins...")
+    print(f"   Before filtering: {len(geometries_gdf):,} records")
+
+    # GOGI Type field: 1=Basin, 3=Basin, 4=Basin/Region, None=Actual Field
+    # Filter to keep only actual fields (Type is None/null)
+    if 'Type' in geometries_gdf.columns:
+        basins = geometries_gdf[geometries_gdf['Type'].notna()]
+        print(f"   Basin records to exclude: {len(basins):,}")
+        if len(basins) > 0:
+            print(f"   Basin types found: {basins['Type'].value_counts().to_dict()}")
+        geometries_gdf = geometries_gdf[geometries_gdf['Type'].isna()].copy()
+    else:
+        print(f"   WARNING: 'Type' column not found, cannot filter basins")
+
+    print(f"   After filtering: {len(geometries_gdf):,} actual fields")
 
     # Extract and transform attributes
     print(f"\n3. Extracting static attributes...")
     output_records = []
 
-    for idx, row in df.iterrows():
+    for idx, row in geometries_gdf.iterrows():
         field_data = {}
 
         # ===== Identity =====
-        field_data['field_id'] = str(row.get('MD_Fkey', f'GOGI_{idx}'))
+        # Use shapefile index as unique ID since MD_Fkey is not unique
+        field_data['field_id'] = f'GOGI_{country[:2].upper()}_{idx}'
         field_data['name'] = row.get('Facility_N')
         field_data['country'] = country
 
@@ -215,11 +256,8 @@ def extract_gogi_fields(country: str) -> pd.DataFrame:
         field_data['functional_unit'] = parse_functional_unit(row.get('Commodity'))
 
         # ===== Geometry =====
-        # Match by index (assuming DBF and SHP are in same order)
-        if idx < len(geometries):
-            field_data['geometry'] = geometries[idx].get('geometry')
-        else:
-            field_data['geometry'] = None
+        # Geometry is already transformed to WGS84 in read_shp_geometries_as_gdf
+        field_data['geometry'] = row.get('geometry_json')
 
         # ===== Field Characteristics =====
         # Offshore
@@ -235,6 +273,8 @@ def extract_gogi_fields(country: str) -> pd.DataFrame:
     # Print summary statistics
     print(f"\n4. Extraction Summary:")
     print(f"   Total fields: {len(output_df):,}")
+    print(f"   Unique field names: {output_df['name'].nunique():,}")
+    print(f"   Unique field IDs: {output_df['field_id'].nunique():,}")
     print(f"\n   Attribute coverage:")
     for col in ['geometry', 'functional_unit', 'offshore', 'age']:
         non_null = output_df[col].notna().sum()

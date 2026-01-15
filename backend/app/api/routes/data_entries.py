@@ -22,11 +22,18 @@ from app.postgres.models.data_entry import (
     DataGranularity,
     DataEntry,
 )
-from app.schemas.data_entry import DataEntryInfo
+from app.schemas.data_entry import (
+    DataEntryInfo,
+    BatchProcessRequest,
+    BatchProcessResponse,
+    BatchEntryResult,
+    MatchSequence,
+)
 from app.services.data_entry_service import validate_data_entry
 from app.services.data_entry_service import (
     trigger_data_processing,
     get_data_entry_status,
+    batch_process_entries,
 )
 from app.services.data_source_service import check_data_source_access
 from app.api.deps import CurrentUser, DBSessionDep
@@ -167,7 +174,8 @@ async def process_data_entry(
     background_tasks: BackgroundTasks,
     current_user: CurrentUser,
     db: DBSessionDep,
-    prevent_self_matching: bool = False,  # Add this parameter
+    prevent_self_matching: bool = False,
+    match_by_source_id: bool = False,
 ) -> Dict[str, Any]:
     """
     Trigger processing of a data entry.
@@ -178,6 +186,7 @@ async def process_data_entry(
         current_user: Current authenticated user
         db: Database session
         prevent_self_matching: Prevent matching to fields from the same processing session
+        match_by_source_id: Match by source field identifier instead of fuzzy name/geo matching
 
     Returns:
         Dict with processing status
@@ -198,9 +207,9 @@ async def process_data_entry(
             detail="You don't have access to this data entry's source",
         )
 
-    # Trigger processing with the prevent_self_matching option
+    # Trigger processing with the matching options
     result = await trigger_data_processing(
-        data_entry, background_tasks, db, prevent_self_matching
+        data_entry, background_tasks, db, prevent_self_matching, match_by_source_id
     )
 
     if not result["success"]:
@@ -255,3 +264,57 @@ async def get_processing_status(
         )
 
     return status_result
+
+
+@router.post("/batch-process", response_model=BatchProcessResponse)
+async def batch_process_data_entries(
+    request: BatchProcessRequest,
+    current_user: CurrentUser,
+    db: DBSessionDep,
+) -> BatchProcessResponse:
+    """
+    Process multiple data entries in a controlled sequence.
+
+    This endpoint allows you to:
+    - Process multiple entries in a single request
+    - Control the processing order by data source quality score, time recency, or custom order
+    - Configure matching behavior per entry (prevent_self_matching, match_by_source_id)
+
+    The entries are processed SYNCHRONOUSLY in sequence, not in parallel.
+    Higher quality sources should be processed first to create base fields that
+    lower quality sources can match against.
+
+    Args:
+        request: Batch processing configuration with entries and match_sequence
+        current_user: Current authenticated user
+        db: Database session
+
+    Returns:
+        BatchProcessResponse with results for each entry
+    """
+    # Validate all entries exist and user has access
+    entry_ids = [e.entry_id for e in request.entries]
+    entries = db.query(DataEntry).filter(DataEntry.id.in_(entry_ids)).all()
+
+    if len(entries) != len(entry_ids):
+        found_ids = {e.id for e in entries}
+        missing_ids = [eid for eid in entry_ids if eid not in found_ids]
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Data entries not found: {missing_ids}",
+        )
+
+    # Check user access to all data sources
+    source_ids = {e.source_id for e in entries}
+    for source_id in source_ids:
+        has_access = await check_data_source_access(source_id, current_user, db)
+        if not has_access and not current_user.is_superuser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"You don't have access to data source {source_id}",
+            )
+
+    # Process entries
+    result = batch_process_entries(request, db)
+
+    return result

@@ -36,11 +36,11 @@ class PyxisAPIClient:
 
     def login(self, email: str, password: str) -> bool:
         """Login to get JWT token."""
-        url = f"{self.base_url}/api/v1/login/email"
-        data = {"email": email, "password": password}
+        url = f"{self.base_url}/api/v1/login/access-token"
+        data = {"username": email, "password": password}
 
         try:
-            response = requests.post(url, json=data, timeout=30)
+            response = requests.post(url, data=data, timeout=30)
             response.raise_for_status()
 
             result = response.json()
@@ -218,7 +218,7 @@ def upload_global_source(source: str, country: str, email: str, password: str,
     # Trigger processing
     print(f"\n4. Triggering processing...")
     try:
-        result = client.trigger_processing(data_entry_id, prevent_self_matching=True)
+        result = client.trigger_processing(data_entry_id, prevent_self_matching=False)
         print(f"   ✓ Processing started")
         print(f"   Message: {result.get('message', 'N/A')}")
 

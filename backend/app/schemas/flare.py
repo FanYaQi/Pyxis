@@ -109,16 +109,17 @@ class FlareAssignmentRequest(BaseModel):
             raise ValueError('end_date must be after or equal to start_date')
         return end_date
     
-    @model_validator(mode='after')
-    def validate_field_selection(self):
-        """Validate that either field_ids or country is provided, but not both"""
-        if self.field_ids is not None and self.country is not None:
-            raise ValueError('Provide either field_ids or country, not both')
-        
-        if self.field_ids is None and self.country is None:
-            raise ValueError('Must provide either field_ids or country')
-            
-        return self
+    # Temporarily disabled - this validator is interfering with OpgeeInputRequest
+    # @model_validator(mode='after')
+    # def validate_field_selection(self):
+    #     """Validate that either field_ids or country is provided, but not both"""
+    #     if self.field_ids is not None and self.country is not None:
+    #         raise ValueError('Provide either field_ids or country, not both')
+    #
+    #     if self.field_ids is None and self.country is None:
+    #         raise ValueError('Must provide either field_ids or country')
+    #
+    #     return self
 
 
 class FlareAssignmentStatistics(BaseModel):

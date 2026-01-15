@@ -36,7 +36,7 @@ class OpgeeInputRequest(BaseModel):
         0.5, description="Minimum ratio of sources required (0.0-1.0)", ge=0.0, le=1.0
     )
     trusted_source_types: List[SourceType] = Field(
-        default=[SourceType.GOVERNMENT], 
+        default_factory=lambda: [SourceType.GOVERNMENT],
         description="Source types that bypass coverage requirements"
     )
 
