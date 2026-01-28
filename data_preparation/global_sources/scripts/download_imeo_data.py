@@ -21,6 +21,7 @@ import pandas as pd
 
 # IMEO API Configuration
 IMEO_API_BASE = "https://imeo-api.unep.org/api/v1"
+IMEO_API_TOKEN = "3os7P2xOWq7IPlIlbTFf8SPwuOdoZ4hINBIcisxbAZ3G55EG7Nc2U4cOnJGe6jX34u1mnSrLf7xciFVSksWrd4dDm37teWvR9jU0yOdmjzO69hEdjAHGYWYAv2Xl2Vae5nt9LiYZOedqpigmydsc1v"
 
 
 class IMEODataDownloader:

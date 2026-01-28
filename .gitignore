@@ -8,6 +8,14 @@ docs/legacy
 db/data
 CLAUDE.md
 
+# Global sources data (keep scripts, ignore data)
+data_preparation/global_sources/methane_CM_raw/
+data_preparation/global_sources/methane_CM_processed/
+data_preparation/global_sources/methane_raw_imeo/
+data_preparation/global_sources/methane_raw_samples/
+data_preparation/global_sources/flaring/
+backups/
+
 # Sensitive Information
 .pyxis_pass
 
